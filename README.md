@@ -1,16 +1,112 @@
-# React + Vite
+# NEPL — Nyati Era Premier League · Box Cricket Auction Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A full-stack React + Node.js application for live cricket player auctions, team squad management, standings, and rules for the Nyati Era Dhanori community.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech Stack
 
-## React Compiler
+| Layer | Technology |
+|---|---|
+| Frontend | React 19 + Vite + Tailwind CSS |
+| Backend | Node.js + Express 5 |
+| Database | MongoDB Atlas (via Mongoose) |
+| Auth | Role-based (Session) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## Architecture
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```
+Browser (React)
+    │
+    │  HTTP/JSON calls to /api/*
+    ▼
+Express Server (Node.js — server/index.js)  ← port 3001
+    │
+    │  Mongoose queries
+    ▼
+MongoDB Atlas (nepl_cricket database)
+```
+
+> **Why this structure?**  
+> MongoDB drivers only run in server-side environments (Node.js, Python, Go, etc.), NOT in browsers.  
+> The Express layer acts as a secure bridge between the browser and the database.
+
+---
+
+## Getting Started
+
+### 1. Get your MongoDB Connection String
+
+1. Log in to [MongoDB Atlas](https://cloud.mongodb.com) with username **`codelocked`**
+2. Click your cluster → **Connect** → **Connect your application**
+3. Choose **Node.js / Mongoose** as the driver
+4. Copy the connection string (looks like `mongodb+srv://codelocked:...@cluster0.xxxxx.mongodb.net/`)
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set:
+```
+MONGODB_URI=mongodb+srv://codelocked:teHuNben4veJ3zxA@cluster0.XXXXX.mongodb.net/nepl_cricket
+```
+Replace `cluster0.XXXXX.mongodb.net` with your actual cluster hostname from Step 1.
+
+### 3. Install Dependencies
+
+```bash
+npm install
+```
+
+### 4. Run Both Servers
+
+```bash
+# Starts both Vite (port 5173) + Express (port 3001) together
+npm run dev:full
+```
+
+Or run them separately:
+```bash
+# Terminal 1: Frontend
+npm run dev
+
+# Terminal 2: Backend
+npm run server
+```
+
+---
+
+## MongoDB Atlas IP Whitelist
+
+Go to **Atlas → Network Access** and add your IP address (or `0.0.0.0/0` for development).
+
+---
+
+## Auth Credentials
+
+| Role | Email | Password |
+|---|---|---|
+| ⚡ Super Admin | `admin@nepl.in` | `Nyati@Super2024` |
+| 🔨 Auctioneer | `auction@nepl.in` | `Auction@NEPL2024` |
+| 🏏 Player | `player@nepl.in` | `Player@NEPL2024` |
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/health` | Check server + DB status |
+| GET | `/api/players` | Fetch all players |
+| PUT | `/api/players` | Bulk save players |
+| PUT | `/api/players/:id` | Update single player |
+| GET | `/api/teams` | Fetch all teams |
+| PUT | `/api/teams` | Bulk save teams |
+| PUT | `/api/teams/:id` | Update single team |
+| GET | `/api/history` | Fetch bid history |
+| PUT | `/api/history` | Bulk save history |
+| POST | `/api/history` | Add single bid entry |

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Gavel, 
   Users, 
@@ -10,8 +10,14 @@ import {
   VolumeX, 
   RotateCcw,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  LogOut,
+  ChevronDown,
+  Shield,
+  UserCheck,
 } from 'lucide-react';
+import { useAuth } from '../auth/AuthContext';
+import AuctioneerManagerModal from './AuctioneerManagerModal';
 
 export default function Header({ 
   activeTab, 
@@ -22,44 +28,57 @@ export default function Header({
   setSoundEnabled, 
   onResetData 
 }) {
-  const tabs = [
-    { id: 'auction', label: 'Live Auction Arena', icon: Gavel },
-    { id: 'teams', label: 'Teams & Purse', icon: Users },
-    { id: 'players', label: 'Nyati Player Pool', icon: Trophy },
-    { id: 'rules', label: 'Rules & Guidelines', icon: BookOpen },
-    { id: 'schedule', label: 'Matches & NRR Table', icon: Calendar },
+  const { user, logout, can, roleConfig } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isManagerOpen, setIsManagerOpen] = useState(false);
+
+  // Filter tabs based on role permissions
+  const allTabs = [
+    { id: 'auction', label: 'Live Auction', icon: Gavel, permission: 'canViewAuction' },
+    { id: 'teams', label: 'Teams & Purse', icon: Users, permission: 'canViewTeams' },
+    { id: 'players', label: 'Players Pool', icon: Trophy, permission: 'canViewPlayers' },
+    { id: 'rules', label: 'Rules', icon: BookOpen, permission: 'canViewRules' },
+    { id: 'schedule', label: 'Schedule', icon: Calendar, permission: 'canViewSchedule' },
   ];
 
+  const tabs = allTabs.filter(t => can(t.permission));
+
   return (
-    <header className="sticky top-0 z-40 glass-panel border-b border-slate-800/80 shadow-2xl">
+    <header className="sticky top-0 z-40 bg-[#070b14]/85 backdrop-blur-xl border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-[72px]">
           
-          {/* Logo & League Branding */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('auction')}>
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-amber-400 p-0.5 shadow-lg shadow-emerald-500/20">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <Gavel className="w-6 h-6 text-emerald-400 transform -rotate-45" />
+          {/* ── Logo & Branding ── */}
+          <div 
+            className="flex items-center space-x-3 cursor-pointer group" 
+            onClick={() => setActiveTab(tabs[0]?.id || 'auction')}
+          >
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-neon-violet p-[2px] shadow-[0_0_20px_rgba(0,242,254,0.4)] group-hover:shadow-[0_0_30px_rgba(0,242,254,0.7)] transition-all duration-300 flex-shrink-0">
+              <div className="w-full h-full bg-[#070b14] rounded-[14px] flex items-center justify-center">
+                <Gavel className="w-5 h-5 text-cyan-400 transform -rotate-45 group-hover:scale-110 transition-transform duration-300" />
               </div>
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+                <h1 className="text-xl font-black tracking-wider gradient-text-brand font-display uppercase">
                   NYATI ERA
                 </h1>
-                <span className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  NEPL Box Cricket
+                <span className="hidden sm:inline-flex px-2.5 py-0.5 text-[9px] font-black tracking-widest uppercase rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 shadow-[0_0_10px_rgba(0,242,254,0.2)]">
+                  2026+
+                </span>
+                <span className="hidden md:inline-flex px-2.5 py-0.5 text-[10px] font-semibold rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 shadow-[0_0_10px_rgba(121,40,202,0.2)] font-serif tracking-wide">
+                  कर्मण्येवाधिकारस्ते
                 </span>
               </div>
-              <p className="text-xs text-slate-400 flex items-center gap-1">
-                Dhanori Box Cricket Premier League 
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <p className="text-[10px] text-slate-400 flex items-center gap-1.5 font-medium tracking-wide">
+                Box Cricket League · 2026 Onwards
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
               </p>
             </div>
           </div>
 
-          {/* Center Navigation Tabs */}
-          <nav className="hidden lg:flex items-center space-x-1 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800">
+          {/* ── Center Cyber Navigation ── */}
+          <nav className="hidden lg:flex items-center space-x-1 bg-[#0b1120]/90 p-1.5 rounded-2xl border border-cyan-500/20 shadow-inner">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -67,10 +86,10 @@ export default function Header({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-display font-semibold text-xs tracking-wide transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 font-semibold scale-[1.02]'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 shadow-[0_0_20px_rgba(0,242,254,0.45)] scale-[1.03]'
+                      : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800/50'
                   }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
@@ -80,57 +99,123 @@ export default function Header({
             })}
           </nav>
 
-          {/* Right Utilities Controls */}
-          <div className="flex items-center space-x-3">
-            {/* CricHeroes badge link */}
+          {/* ── Right Cyber Controls ── */}
+          <div className="flex items-center space-x-2.5">
+            {/* CricHeroes */}
             <a
               href="https://cricheroes.com"
               target="_blank"
               rel="noreferrer"
-              className="hidden md:flex items-center space-x-1 text-xs px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-amber-400 border border-amber-500/30 transition"
-              title="Verified CricHeroes Data"
+              className="hidden md:flex items-center space-x-1.5 text-[11px] px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(255,183,3,0.15)] transition"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="font-semibold">CricHeroes</span>
-              <ExternalLink className="w-3 h-3 text-slate-400" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span className="font-bold">CricHeroes</span>
+              <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
             </a>
 
-            {/* Sound FX Toggle */}
+            {/* Manage Auctioneers — Super Admin Only */}
+            {can('canManageUsers') && (
+              <button
+                onClick={() => setIsManagerOpen(true)}
+                className="hidden sm:flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-display font-bold text-[10px] uppercase tracking-wider shadow-[0_0_15px_rgba(121,40,202,0.25)] transition"
+                title="Manage Auctioneers & Access"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-purple-400" />
+                <span>Auctioneers</span>
+              </button>
+            )}
+
+            {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
               className={`p-2.5 rounded-xl border transition ${
                 soundEnabled
-                  ? 'bg-slate-800 text-emerald-400 border-emerald-500/40 hover:bg-slate-700'
-                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800'
+                  ? 'bg-slate-900 text-cyan-400 border-cyan-500/30 hover:bg-slate-800 shadow-[0_0_12px_rgba(0,242,254,0.2)]'
+                  : 'bg-slate-950 text-slate-600 border-slate-800 hover:bg-slate-900'
               }`}
               title={soundEnabled ? 'Mute Sound FX' : 'Enable Sound FX'}
             >
-              {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
 
-            {/* Projector / TV Screen Mode */}
-            <button
-              onClick={() => setIsProjectorMode(!isProjectorMode)}
-              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition"
-              title="Toggle Projector / TV Display Mode"
-            >
-              <Tv className="w-4 h-4 text-slate-950" />
-              <span className="hidden sm:inline">TV Screen</span>
-            </button>
+            {/* Projector / TV Screen */}
+            {can('canAccessProjector') && (
+              <button
+                onClick={() => setIsProjectorMode(!isProjectorMode)}
+                className="hidden sm:flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-display font-black text-[10px] uppercase tracking-wider shadow-[0_0_18px_rgba(255,183,3,0.4)] hover:brightness-110 transition cursor-pointer"
+                title="Toggle Projector / TV Display Mode"
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span>TV Screen</span>
+              </button>
+            )}
 
-            {/* Reset Auction Data */}
-            <button
-              onClick={onResetData}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-500/30 transition"
-              title="Reset Auction Data"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            {/* Reset — superuser only */}
+            {can('canResetData') && (
+              <button
+                onClick={onResetData}
+                className="p-2.5 rounded-xl bg-slate-950 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-slate-800 hover:border-rose-500/40 transition"
+                title="Reset Auction Data"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {/* User Menu */}
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(v => !v)}
+                  className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-cyan-500/25 hover:border-cyan-400/50 transition shadow-md"
+                >
+                  <span className="text-base leading-none">{user.avatar}</span>
+                  <div className="hidden sm:block text-left">
+                    <div className="text-xs font-bold text-slate-100 leading-tight font-display">{user.name}</div>
+                    <div className="text-[9px] font-semibold text-cyan-400 uppercase tracking-wider">
+                      {roleConfig?.label}
+                    </div>
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown */}
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 warm-card rounded-2xl border border-cyan-500/30 shadow-[0_10px_40px_rgba(0,0,0,0.8)] p-2.5 z-50">
+                    {/* Role badge */}
+                    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1.5 bg-slate-900/90 border border-cyan-500/30">
+                      <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-cyan-300 font-display">{roleConfig?.label}</div>
+                        <div className="text-[10px] text-slate-400 font-mono truncate">{user.email}</div>
+                      </div>
+                    </div>
+
+                    {can('canManageUsers') && (
+                      <button
+                        onClick={() => { setIsManagerOpen(true); setShowUserMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-slate-300 hover:bg-slate-800/80 hover:text-cyan-300 transition mb-1"
+                      >
+                        <UserCheck className="w-4 h-4 text-purple-400" />
+                        Manage Auctioneers
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => { logout(); setShowUserMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Mobile Tab Bar */}
-        <div className="flex lg:hidden overflow-x-auto py-2.5 space-x-2 border-t border-slate-800/60 no-scrollbar">
+        {/* ── Mobile Cyber Tab Bar ── */}
+        <div className="flex lg:hidden overflow-x-auto py-2.5 space-x-2 border-t border-cyan-500/15 no-scrollbar">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -138,9 +223,9 @@ export default function Header({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap font-medium transition ${
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap font-display font-semibold transition ${
                   isActive
-                    ? 'bg-emerald-500 text-slate-950 font-semibold'
+                    ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 shadow-[0_0_15px_rgba(0,242,254,0.4)]'
                     : 'bg-slate-900 text-slate-400 border border-slate-800'
                 }`}
               >
@@ -150,8 +235,18 @@ export default function Header({
             );
           })}
         </div>
-
       </div>
+
+      {/* Auctioneer Manager Modal */}
+      <AuctioneerManagerModal
+        isOpen={isManagerOpen}
+        onClose={() => setIsManagerOpen(false)}
+      />
+
+      {/* Click outside to close user menu */}
+      {showUserMenu && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+      )}
     </header>
   );
 }

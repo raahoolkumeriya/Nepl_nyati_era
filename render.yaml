@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: nyati-era-box-cricket
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run server
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production

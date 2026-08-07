@@ -145,31 +145,31 @@ export default function ScheduleStandings({ teams }) {
     <div className="space-y-8">
       
       {/* Top Banner */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-emerald-400" />
+            <Calendar className="w-6 h-6 text-cricket-emerald" />
             NEPL Standings & Schedule Simulator
           </h2>
-          <p className="text-slate-400 text-xs mt-1">
+          <p className="text-sand-500 text-xs mt-1">
             Real-time NRR calculator and playoff standings according to official round-robin league rules.
           </p>
         </div>
       </div>
 
       {/* Points Table & NRR Standings */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+      <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-400" />
+            <Trophy className="w-5 h-5 text-[#c9a227]" />
             League Points Table (Ranked by Points & NRR)
           </h3>
-          <span className="text-xs text-slate-400 font-mono">5 Matches / Team</span>
+          <span className="text-xs text-sand-500 font-mono">5 Matches / Team</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/80 text-slate-400 font-mono uppercase tracking-wider border-b border-slate-800">
+          <table className="w-full text-left text-xs text-sand-300">
+            <thead className="bg-warm-900/80 text-sand-500 font-mono uppercase tracking-wider border-b border-warm-700/50">
               <tr>
                 <th className="py-3.5 px-4">Pos</th>
                 <th className="py-3.5 px-4">Team</th>
@@ -181,7 +181,7 @@ export default function ScheduleStandings({ teams }) {
                 <th className="py-3.5 px-4 text-right">Qualification Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono">
+            <tbody className="divide-y divide-warm-700/40 font-mono">
               {sortedStandings.map((team, idx) => {
                 const isTopper = idx === 0;
                 const isSemi = idx === 1 || idx === 2;
@@ -189,33 +189,33 @@ export default function ScheduleStandings({ teams }) {
                 return (
                   <tr
                     key={team.id}
-                    className={`hover:bg-slate-900/40 transition ${
-                      isTopper ? 'bg-amber-500/10' : isSemi ? 'bg-emerald-500/5' : ''
+                    className={`hover:bg-warm-900/40 transition ${
+                      isTopper ? 'bg-[#c9a227]/10' : isSemi ? 'bg-cricket-emerald/5' : ''
                     }`}
                   >
-                    <td className="py-3.5 px-4 font-bold text-slate-200">{idx + 1}</td>
+                    <td className="py-3.5 px-4 font-bold text-sand-200">{idx + 1}</td>
                     <td className="py-3.5 px-4 font-sans font-bold text-white flex items-center space-x-2">
                       <span>{team.logo}</span>
                       <span>{team.name}</span>
                     </td>
                     <td className="py-3.5 px-4 text-center">{team.played}</td>
-                    <td className="py-3.5 px-4 text-center font-bold text-emerald-400">{team.won}</td>
+                    <td className="py-3.5 px-4 text-center font-bold text-cricket-emerald">{team.won}</td>
                     <td className="py-3.5 px-4 text-center text-red-400">{team.lost}</td>
-                    <td className="py-3.5 px-4 text-center font-extrabold text-amber-400 text-sm">{team.points}</td>
+                    <td className="py-3.5 px-4 text-center font-extrabold text-[#c9a227] text-sm">{team.points}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-cyan-400">
                       {team.nrr > 0 ? `+${team.nrr}` : team.nrr}
                     </td>
                     <td className="py-3.5 px-4 text-right font-sans">
                       {isTopper ? (
-                        <span className="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 font-extrabold text-[10px] uppercase border border-amber-500/40">
+                        <span className="px-2.5 py-1 rounded-md bg-[#c9a227]/15 text-[#c9a227] font-extrabold text-[10px] uppercase border border-[#c9a227]/30">
                           Finals Qualified 🏆
                         </span>
                       ) : isSemi ? (
-                        <span className="px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-[10px] uppercase border border-emerald-500/40">
+                        <span className="px-2.5 py-1 rounded-md bg-cricket-emerald/15 text-cricket-emerald font-bold text-[10px] uppercase border border-cricket-emerald/30">
                           Semifinalist ⚡
                         </span>
                       ) : (
-                        <span className="text-slate-500 text-[10px]">Eliminated</span>
+                        <span className="text-sand-600 text-[10px]">Eliminated</span>
                       )}
                     </td>
                   </tr>
@@ -227,48 +227,48 @@ export default function ScheduleStandings({ teams }) {
       </div>
 
       {/* Playoff Bracket Visualization */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+      <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 space-y-4">
         <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-          <Zap className="w-5 h-5 text-emerald-400" />
+          <Zap className="w-5 h-5 text-cricket-emerald" />
           NEPL Playoff Bracket
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           
           {/* Semifinal Match Card */}
-          <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs text-amber-400 font-bold">
+          <div className="p-5 rounded-2xl bg-warm-900/80 border border-warm-700/50 space-y-3">
+            <div className="flex items-center justify-between text-xs text-[#c9a227] font-bold">
               <span>SEMIFINAL MATCH</span>
               <span>2nd Place vs 3rd Place</span>
             </div>
-            <div className="p-3 bg-slate-950 rounded-xl space-y-2 border border-slate-800/80">
+            <div className="p-3 bg-warm-950 rounded-xl space-y-2 border border-warm-700/50/80">
               <div className="flex items-center justify-between text-sm font-bold text-white">
                 <span>{rank2 ? rank2.name : 'Rank 2 Team'}</span>
-                <span className="text-xs text-slate-400">Seed #2</span>
+                <span className="text-xs text-sand-500">Seed #2</span>
               </div>
-              <div className="text-center text-[10px] font-mono text-emerald-400 uppercase">VS</div>
+              <div className="text-center text-[10px] font-mono text-cricket-emerald uppercase">VS</div>
               <div className="flex items-center justify-between text-sm font-bold text-white">
                 <span>{rank3 ? rank3.name : 'Rank 3 Team'}</span>
-                <span className="text-xs text-slate-400">Seed #3</span>
+                <span className="text-xs text-sand-500">Seed #3</span>
               </div>
             </div>
           </div>
 
           {/* Finals Match Card */}
-          <div className="p-5 rounded-2xl bg-gradient-to-tr from-amber-500/10 via-yellow-500/5 to-amber-500/20 border border-amber-500/40 space-y-3">
-            <div className="flex items-center justify-between text-xs text-amber-400 font-bold">
+          <div className="p-5 rounded-2xl bg-gradient-to-tr from-amber-500/10 via-yellow-500/5 to-amber-500/20 border border-[#c9a227]/30 space-y-3">
+            <div className="flex items-center justify-between text-xs text-[#c9a227] font-bold">
               <span>NEPL GRAND FINALS 🏆</span>
               <span>Sunday 8 PM Finish</span>
             </div>
-            <div className="p-3 bg-slate-950/80 rounded-xl space-y-2 border border-amber-500/30">
-              <div className="flex items-center justify-between text-sm font-extrabold text-amber-400">
+            <div className="p-3 bg-warm-950/80 rounded-xl space-y-2 border border-amber-500/30">
+              <div className="flex items-center justify-between text-sm font-extrabold text-[#c9a227]">
                 <span>{tableTopper ? tableTopper.name : 'Table Topper'}</span>
-                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-[10px]">Direct Finalist</span>
+                <span className="px-2 py-0.5 rounded bg-[#c9a227]/15 text-[10px]">Direct Finalist</span>
               </div>
-              <div className="text-center text-[10px] font-mono text-emerald-400 uppercase">VS</div>
+              <div className="text-center text-[10px] font-mono text-cricket-emerald uppercase">VS</div>
               <div className="flex items-center justify-between text-sm font-bold text-white">
                 <span>Winner of Semifinal</span>
-                <span className="text-xs text-slate-400">Semifinal Winner</span>
+                <span className="text-xs text-sand-500">Semifinal Winner</span>
               </div>
             </div>
           </div>
@@ -277,7 +277,7 @@ export default function ScheduleStandings({ teams }) {
       </div>
 
       {/* Match Scheduler & Scorekeeper */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
+      <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 space-y-6">
         <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
           <PlayCircle className="w-5 h-5 text-cyan-400" />
           Round Robin League Match Center & Scorekeeper
@@ -306,15 +306,15 @@ function MatchCard({ match, onSaveScore }) {
   const [ov2, setOv2] = useState(match.overs2 || '');
 
   return (
-    <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-      <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
-        <span className="font-bold text-emerald-400">{match.round}</span>
+    <div className="p-4 rounded-2xl bg-warm-900/80 border border-warm-700/50 space-y-3">
+      <div className="flex items-center justify-between text-xs text-sand-500 font-mono">
+        <span className="font-bold text-cricket-emerald">{match.round}</span>
         <span>{match.status}</span>
       </div>
 
       <div className="space-y-2 text-xs">
         {/* Team 1 Score Input */}
-        <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+        <div className="flex items-center justify-between bg-warm-950 p-2.5 rounded-xl border border-warm-700/50">
           <span className="font-bold text-white">{match.team1}</span>
           <div className="flex items-center space-x-1">
             <input
@@ -322,22 +322,22 @@ function MatchCard({ match, onSaveScore }) {
               placeholder="Runs"
               value={s1}
               onChange={(e) => setS1(e.target.value)}
-              className="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white font-mono text-center"
+              className="w-14 bg-warm-900 border border-warm-700/50 rounded px-2 py-1 text-xs text-white font-mono text-center"
             />
-            <span className="text-slate-500 font-mono">/</span>
+            <span className="text-sand-600 font-mono">/</span>
             <input
               type="number"
               step="0.1"
               placeholder="Overs"
               value={ov1}
               onChange={(e) => setOv1(e.target.value)}
-              className="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white font-mono text-center"
+              className="w-14 bg-warm-900 border border-warm-700/50 rounded px-2 py-1 text-xs text-white font-mono text-center"
             />
           </div>
         </div>
 
         {/* Team 2 Score Input */}
-        <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+        <div className="flex items-center justify-between bg-warm-950 p-2.5 rounded-xl border border-warm-700/50">
           <span className="font-bold text-white">{match.team2}</span>
           <div className="flex items-center space-x-1">
             <input
@@ -345,16 +345,16 @@ function MatchCard({ match, onSaveScore }) {
               placeholder="Runs"
               value={s2}
               onChange={(e) => setS2(e.target.value)}
-              className="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white font-mono text-center"
+              className="w-14 bg-warm-900 border border-warm-700/50 rounded px-2 py-1 text-xs text-white font-mono text-center"
             />
-            <span className="text-slate-500 font-mono">/</span>
+            <span className="text-sand-600 font-mono">/</span>
             <input
               type="number"
               step="0.1"
               placeholder="Overs"
               value={ov2}
               onChange={(e) => setOv2(e.target.value)}
-              className="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white font-mono text-center"
+              className="w-14 bg-warm-900 border border-warm-700/50 rounded px-2 py-1 text-xs text-white font-mono text-center"
             />
           </div>
         </div>
@@ -362,12 +362,12 @@ function MatchCard({ match, onSaveScore }) {
 
       <div className="flex items-center justify-between pt-1">
         {match.winner ? (
-          <span className="text-[11px] font-bold text-emerald-400 font-mono flex items-center gap-1">
+          <span className="text-[11px] font-bold text-cricket-emerald font-mono flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
             {match.winner} WON
           </span>
         ) : (
-          <span className="text-[10px] text-slate-500">8 Overs Innings Limit</span>
+          <span className="text-[10px] text-sand-600">8 Overs Innings Limit</span>
         )}
 
         <button

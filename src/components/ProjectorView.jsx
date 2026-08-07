@@ -64,32 +64,37 @@ export default function ProjectorView({
   const currentBid = activePlayer ? (activePlayer.currentBid || activePlayer.basePrice) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#070A12] text-white flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-warm-950 text-white flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden">
       
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-terracotta-600/8 rounded-full blur-[120px] pointer-events-none"></div>
 
       {/* Top Header Controls */}
       <div className="flex items-center justify-between z-10">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-terracotta-600 text-white flex items-center justify-center font-bold">
             <Gavel className="w-6 h-6 transform -rotate-45" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-wider bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-              NYATI ERA PREMIER LEAGUE (NEPL)
-            </h1>
-            <p className="text-xs text-emerald-400 font-mono font-bold tracking-widest uppercase">
-              LIVE AUCTION PROJECTOR SCREEN
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-wider gradient-text-brand font-display uppercase">
+                NYATI ERA PREMIER LEAGUE 2026+
+              </h1>
+              <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-serif font-bold shadow-[0_0_12px_rgba(121,40,202,0.3)]">
+                कर्मण्येवाधिकारस्ते
+              </span>
+            </div>
+            <p className="text-xs text-cyan-400 font-mono font-bold tracking-widest uppercase">
+              LIVE AUCTION PROJECTOR SCREEN · © 2026 ONWARDS
             </p>
           </div>
         </div>
 
         <button
           onClick={onClose}
-          className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold uppercase transition"
+          className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-warm-900 hover:bg-warm-800 text-sand-300 border border-warm-700 text-xs font-bold uppercase transition"
         >
-          <Tv className="w-4 h-4 text-emerald-400" />
+          <Tv className="w-4 h-4 text-terracotta-400" />
           <span>Exit TV Mode</span>
         </button>
       </div>
@@ -101,7 +106,7 @@ export default function ProjectorView({
           {/* Player Photo Card */}
           <div className="lg:col-span-5 flex flex-col items-center">
             <div className="relative">
-              <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border-4 border-emerald-500/50 shadow-[0_0_50px_rgba(16,185,129,0.3)] bg-slate-900">
+              <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border-4 border-terracotta-500/50 shadow-[0_0_50px_rgba(212,98,42,0.25)] bg-slate-900">
                 <img
                   src={activePlayer.avatarUrl}
                   alt={activePlayer.name}
@@ -111,7 +116,7 @@ export default function ProjectorView({
                   }}
                 />
               </div>
-              <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md px-4 py-1.5 rounded-xl border border-amber-500/50 text-amber-400 font-black text-sm uppercase">
+              <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md px-4 py-1.5 rounded-xl border border-[#c9a227]/50 text-[#c9a227] font-black text-sm uppercase">
                 {activePlayer.category}
               </div>
             </div>
@@ -120,7 +125,7 @@ export default function ProjectorView({
               href={activePlayer.cricHeroesUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 flex items-center space-x-2 text-xs text-amber-400 hover:text-amber-300 font-bold bg-slate-900 px-4 py-2 rounded-xl border border-amber-500/30"
+              className="mt-4 flex items-center space-x-2 text-xs text-[#c9a227] hover:text-[#f5c842] font-bold bg-warm-900 px-4 py-2 rounded-xl border border-[#c9a227]/30"
             >
               <span>Verified CricHeroes.com Player Profile</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -131,7 +136,7 @@ export default function ProjectorView({
           <div className="lg:col-span-7 space-y-6">
             
             <div>
-              <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30">
+              <span className="px-3 py-1 rounded-full bg-terracotta-600/15 text-terracotta-300 font-bold text-xs border border-terracotta-500/25">
                 {activePlayer.role}
               </span>
               <h2 className="text-4xl sm:text-6xl font-black text-white mt-2 tracking-tight">
@@ -140,14 +145,14 @@ export default function ProjectorView({
             </div>
 
             {/* Price Box */}
-            <div className="bg-slate-900/90 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-2xl flex items-center justify-between">
+            <div className="bg-warm-900/90 backdrop-blur-xl p-6 rounded-3xl border border-warm-700/50 shadow-2xl flex items-center justify-between">
               <div>
-                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Base Price</span>
-                <span className="text-2xl font-bold text-slate-300 font-mono">₹{activePlayer.basePrice} PTS</span>
+                <span className="text-sand-500 text-xs font-bold uppercase tracking-wider block">Base Price</span>
+                <span className="text-2xl font-bold text-sand-300 font-mono">₹{activePlayer.basePrice} PTS</span>
               </div>
               <div className="text-right">
-                <span className="text-amber-400 text-xs font-extrabold uppercase tracking-widest block">CURRENT HIGH BID</span>
-                <span className="text-5xl sm:text-6xl font-black text-amber-400 font-mono drop-shadow-[0_0_25px_rgba(245,158,11,0.5)]">
+                <span className="text-[#c9a227] text-xs font-extrabold uppercase tracking-widest block">CURRENT HIGH BID</span>
+                <span className="text-5xl sm:text-6xl font-black text-[#c9a227] font-mono drop-shadow-[0_0_25px_rgba(201,162,39,0.5)]">
                   ₹{currentBid} PTS
                 </span>
               </div>
@@ -155,17 +160,17 @@ export default function ProjectorView({
 
             {/* Leading Team Banner */}
             {leadingTeamObj ? (
-              <div className="p-5 rounded-2xl bg-amber-500/20 border-2 border-amber-500 flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-[#c9a227]/15 border-2 border-[#c9a227] flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">{leadingTeamObj.logo}</span>
                   <div>
-                    <span className="text-xs uppercase text-amber-300 font-bold block">CURRENT HIGHEST BIDDER</span>
+                    <span className="text-xs uppercase text-[#c9a227] font-bold block">CURRENT HIGHEST BIDDER</span>
                     <span className="text-2xl font-black text-white">{leadingTeamObj.name}</span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="p-4 text-center rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 text-slate-400 text-sm">
+              <div className="p-4 text-center rounded-2xl bg-warm-900/60 border border-dashed border-warm-700 text-sand-500 text-sm">
                 Waiting for opening bid...
               </div>
             )}
@@ -176,11 +181,11 @@ export default function ProjectorView({
                 <button
                   key={t.id}
                   onClick={() => handleQuickBid(t, 100)}
-                  className="p-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition active:scale-95"
+                  className="p-3 rounded-2xl bg-warm-900 hover:bg-warm-800 border border-warm-700 text-left transition active:scale-95"
                 >
                   <div className="text-xl mb-1">{t.logo}</div>
                   <span className="font-bold text-white text-xs block truncate">{t.shortName}</span>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold">+100 PTS</span>
+                  <span className="text-[10px] text-cricket-emerald font-mono font-bold">+100 PTS</span>
                 </button>
               ))}
             </div>
@@ -191,8 +196,8 @@ export default function ProjectorView({
               disabled={!leadingTeamObj}
               className={`w-full py-5 rounded-2xl font-black text-xl uppercase tracking-widest transition flex items-center justify-center space-x-3 shadow-2xl ${
                 leadingTeamObj
-                  ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 text-slate-950 hover:scale-[1.02] shadow-emerald-500/40'
-                  : 'bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800'
+                  ? 'bg-gradient-to-r from-terracotta-600 via-terracotta-500 to-terracotta-600 text-white hover:scale-[1.02] shadow-terracotta-600/40'
+                  : 'bg-warm-900 text-sand-600 cursor-not-allowed border border-warm-700'
               }`}
             >
               <Gavel className="w-7 h-7 transform -rotate-45" />
@@ -205,12 +210,12 @@ export default function ProjectorView({
       ) : (
         <div className="text-center space-y-4 my-auto z-10">
           <h2 className="text-4xl font-black text-white">ALL PLAYERS AUCTIONED!</h2>
-          <p className="text-slate-400">Exit TV mode to view final squads and match schedule.</p>
+          <p className="text-sand-500">Exit TV mode to view final squads and match schedule.</p>
         </div>
       )}
 
       {/* Footer info */}
-      <div className="flex items-center justify-between text-xs text-slate-500 font-mono z-10 border-t border-slate-900 pt-4">
+      <div className="flex items-center justify-between text-xs text-sand-600 font-mono z-10 border-t border-warm-800/50 pt-4">
         <span>Nyati Era Dhanori Box Cricket League</span>
         <span>Final Decision: Harish & Santosh</span>
       </div>
