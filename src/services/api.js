@@ -12,7 +12,7 @@
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
-const API_KEY = import.meta.env.VITE_API_KEY || 'NEPL-API-KEY-2026';
+const API_KEY = import.meta.env.VITE_API_KEY || 'TTBPq1o0KhaMicvxAvuyT3Q23qr51XgabEorbqA-kwo';
 
 /** Generic HTTP helper */
 async function apiFetch(path, options = {}) {

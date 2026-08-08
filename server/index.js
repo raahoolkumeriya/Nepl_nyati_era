@@ -47,9 +47,10 @@ app.get('/api/openapi.json', (req, res) => res.json(openApiSpec));
 // Health check
 app.get('/api/health', (req, res) => {
   const dbStatus = mongoose.connection.readyState;
+  const statusMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
   res.json({
     status: 'ok',
-    db: dbStatus === 1 ? 'connected' : dbStatus === 2 ? 'connecting' : 'disconnected',
+    db: statusMap[dbStatus] || 'unknown',
     dbState: dbStatus,
     timestamp: new Date().toISOString(),
   });
@@ -83,6 +84,9 @@ if (!MONGODB_URI || MONGODB_URI.includes('cluster0.example.mongodb.net')) {
 } else {
   mongoose.connect(MONGODB_URI, {
     dbName: 'nepl_cricket',
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 10000,
   })
   .then(async () => {
     console.log('✅  Connected to MongoDB Atlas (nepl_cricket database)');
