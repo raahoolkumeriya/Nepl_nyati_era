@@ -28,14 +28,14 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#070b14] flex items-center justify-center p-4 relative overflow-hidden">
-      
+
       {/* Background ambient cyber glow blobs */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[140px] -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[120px] translate-x-1/4 translate-y-1/4" />
         <div className="absolute top-1/2 left-1/2 w-[350px] h-[350px] bg-blue-500/8 rounded-full blur-[90px] -translate-x-1/2 -translate-y-1/2" />
         {/* Grid pattern overlay */}
-        <div 
+        <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: 'linear-gradient(rgba(0,242,254,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,242,254,0.4) 1px, transparent 1px)',
@@ -45,7 +45,7 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        
+
         {/* Brand Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-neon-violet p-[2px] shadow-[0_0_30px_rgba(0,242,254,0.4)] mb-5">
@@ -130,8 +130,8 @@ export default function LoginPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Authenticating...
                 </span>
@@ -143,7 +143,7 @@ export default function LoginPage() {
         {/* Footer note & Copyright */}
         <div className="text-center mt-8 space-y-1.5">
           <p className="text-xs text-slate-400 font-medium">
-            © 2026 onwards Dhanori Box Cricket Premier League
+            © 2026 onwards Box Cricket Premier League NEPL
           </p>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 text-xs font-serif shadow-[0_0_10px_rgba(121,40,202,0.15)]">
             <span className="text-[10px] uppercase font-sans text-slate-400">Version:</span>

@@ -39,10 +39,44 @@ app.use('/api/teams', teamsRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/rules', rulesRouter);
 
-// ── Interactive API Documentation (OpenAPI 3.0 / Swagger UI) ────────────────
+// ── Interactive API Documentation (OpenAPI 3.0 / Swagger UI & Redoc) ─────────
 app.use('/api/docs', serveSwaggerUi, setupSwaggerUi);
 app.get('/docs', (req, res) => res.redirect('/api/docs'));
 app.get('/api/openapi.json', (req, res) => res.json(openApiSpec));
+
+// Redoc 3-Column API Documentation View (FastAPI style)
+app.get(['/redoc', '/api/redoc'], (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html>
+  <head>
+    <title>NEPL Box Cricket League API — Redoc</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      body { margin: 0; padding: 0; background: #070b14; }
+    </style>
+  </head>
+  <body>
+    <redoc spec-url='/api/openapi.json' theme='{
+      "colors": {
+        "primary": { "main": "#06b6d4" },
+        "success": { "main": "#10b981" },
+        "warning": { "main": "#f59e0b" },
+        "error": { "main": "#f43f5e" }
+      },
+      "typography": {
+        "fontFamily": "Inter, sans-serif",
+        "headings": { "fontFamily": "Inter, sans-serif" },
+        "code": { "fontFamily": "Fira Code, monospace" }
+      },
+      "sidebar": { "backgroundColor": "#0b1120", "textColor": "#cbd5e1" },
+      "rightPanel": { "backgroundColor": "#070b14" }
+    }'></redoc>
+    <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"> </script>
+  </body>
+</html>`);
+});
 
 // Health check
 app.get('/api/health', (req, res) => {

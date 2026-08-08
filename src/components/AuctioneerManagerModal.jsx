@@ -141,9 +141,10 @@ export default function AuctioneerManagerModal({ isOpen, onClose }) {
                   onChange={e => setFormData({ ...formData, role: e.target.value })}
                   className="warm-input cursor-pointer"
                 >
-                  <option value="auctioneer">🔨 Auction Member (Bidding & Selling)</option>
+                  <option value="auctioneer">🔨 Auction Member (Bidding Console)</option>
                   <option value="player">🏏 Player (Roster View Only)</option>
-                  <option value="superuser">⚡ Super Admin (Full Control)</option>
+                  <option value="superuser">⚡ Super Admin (Bidding, Hammer Sold & Management)</option>
+                  <option value="suprememaster">👑 Supreme Master (App Developer - Database Maintenance)</option>
                 </select>
               </div>
             </div>

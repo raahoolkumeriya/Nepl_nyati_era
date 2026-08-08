@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam } from '../services/api';
+import { useAuth } from '../auth/AuthContext';
+import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
 
 export default function ProjectorView({ 
   players = [], 
@@ -22,6 +24,10 @@ export default function ProjectorView({
   setTeams, 
   onClose 
 }) {
+  const { user, can } = useAuth();
+  const isSuperAdmin = user?.role === 'superuser';
+  const canBid = can('canBid');
+  const canSell = can('canSellPlayer');
   // ── Player Priority Logic ──────────────────────────────────────────────────
   // Priority: 1. Available -> 2. Unsold -> 3. Sold (If all players are sold out)
   const availablePlayers = players.filter(p => p.status === 'available');
@@ -73,11 +79,19 @@ export default function ProjectorView({
   };
 
   // ── Quick Bid Handler ─────────────────────────────────────────────────────
-  const handleQuickBid = (team, increment) => {
+  const handleQuickBid = (team, customIncrement) => {
     if (!activePlayer || isSoldOut) return;
-    if (!increment || isNaN(increment) || increment <= 0) return;
+
+    // 🛑 Round-Robin Rule: No team can successively bid on the player against themselves!
+    if (activePlayer.leadingTeam === team.id) {
+      alert(`⚠️ Alternating Bid Rule: ${team.name} is ALREADY the leading bidder! Another team must place a counter-bid before ${team.name} can bid again.`);
+      return;
+    }
 
     const curBid = activePlayer.currentBid || activePlayer.basePrice || 0;
+    const increment = customIncrement || getBidIncrement(curBid);
+    if (!increment || isNaN(increment) || increment <= 0) return;
+
     const nextBid = curBid + increment;
 
     if (nextBid <= 0) {
@@ -385,27 +399,52 @@ export default function ProjectorView({
               </div>
             )}
 
-            {/* Team Bidding Control Suite (Disabled if Sold) */}
+            {/* Dynamic Bidding Tier Indicator */}
+            {!isSoldOut && (
+              <div className="px-4 py-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 flex items-center justify-between text-xs font-mono shadow-md">
+                <div className="flex items-center space-x-2 text-cyan-300">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f2fe]" />
+                  <span className="font-bold uppercase tracking-wider text-[11px]">
+                    {getBidSlabInfo(currentBid).label} · {getBidSlabInfo(currentBid).rangeText}
+                  </span>
+                </div>
+                <span className="text-emerald-400 font-extrabold text-xs">
+                  Slab Step: +₹{getBidIncrement(currentBid)} PTS
+                </span>
+              </div>
+            )}
+
+            {/* Team Bidding Control Suite (Disabled if Sold or Not Authorized) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               {teams.map((t) => {
                 const isCurrentLeading = activePlayer?.leadingTeam === t.id;
+                const isDisabled = isSoldOut || !canBid || isCurrentLeading;
+                const currentInc = getBidIncrement(currentBid);
                 return (
                   <button
                     key={t.id}
-                    disabled={isSoldOut}
-                    onClick={() => handleQuickBid(t, 100)}
-                    className={`p-3 rounded-2xl text-left transition border ${
-                      isSoldOut
+                    disabled={isDisabled}
+                    onClick={() => handleQuickBid(t, currentInc)}
+                    className={`p-3 pl-4 rounded-2xl text-left transition border relative overflow-hidden ${
+                      isDisabled
                         ? 'bg-slate-950/50 border-slate-850 opacity-40 cursor-not-allowed'
                         : isCurrentLeading
                           ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/50 scale-[1.02]'
-                          : 'bg-slate-900/90 hover:bg-slate-800 border-slate-800 text-white active:scale-95'
+                          : 'bg-slate-900/90 hover:bg-slate-800 border-slate-800 text-white active:scale-95 cursor-pointer'
                     }`}
                   >
+                    {/* Vertical Team Color Ribbon Accent */}
+                    <div 
+                      className="absolute top-0 bottom-0 left-0 w-1.5 transition-all duration-300" 
+                      style={{ 
+                        backgroundColor: t.color || '#00f2fe',
+                        boxShadow: `0 0 12px ${t.color || '#00f2fe'}` 
+                      }} 
+                    />
                     <div className="text-xl mb-1">{t.logo}</div>
                     <span className="font-bold text-white text-xs block truncate">{t.shortName}</span>
                     <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                      {isSoldOut ? 'SOLD' : '+100 PTS'}
+                      {isSoldOut ? 'SOLD' : `+${currentInc} PTS`}
                     </span>
                   </button>
                 );
@@ -418,10 +457,10 @@ export default function ProjectorView({
                 <CheckCircle2 className="w-6 h-6 text-rose-400" />
                 <span>PLAYER SOLD OUT TO {buyerTeamObj?.name || 'TEAM'}</span>
               </div>
-            ) : (
+            ) : canSell ? (
               <button
                 onClick={handleSold}
-                disabled={!leadingTeamObj}
+                disabled={isProcessing || !leadingTeamObj}
                 className={`w-full py-5 rounded-2xl font-black text-xl uppercase tracking-widest transition flex items-center justify-center space-x-3 shadow-2xl cursor-pointer ${
                   leadingTeamObj
                     ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 hover:scale-[1.02] shadow-[0_0_30px_rgba(0,242,254,0.45)]'
@@ -431,6 +470,11 @@ export default function ProjectorView({
                 <Gavel className="w-7 h-7 transform -rotate-45 text-slate-950" />
                 <span>HAMMER SOLD (₹{currentBid} PTS)</span>
               </button>
+            ) : (
+              <div className="w-full py-4 rounded-2xl font-bold text-sm bg-slate-900/90 text-slate-400 border border-slate-800 flex items-center justify-center space-x-2">
+                <Lock className="w-5 h-5 text-amber-400" />
+                <span>SUPER ADMIN ONLY (HAMMER SOLD)</span>
+              </div>
             )}
 
           </div>

@@ -16,8 +16,8 @@ export const TOURNAMENT_RULES = [
   {
     id: 'rule-2',
     number: '02',
-    title: 'Auction Player Selection',
-    desc: 'All players are selected through an live auction process where team owners bid for each player using their allocated purse budget.',
+    title: 'Auction Player Selection & Bidding Slabs',
+    desc: 'All players are selected through a live auction using team purse budget. Bidding increments follow tiered slabs: +100 PTS up to 1,000 PTS, +200 PTS between 1,000 to 3,000 PTS, and +300 PTS above 3,000 PTS (+100 for every additional 2,000 PTS crossing).',
     icon: 'Gavel'
   },
   {

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  Trophy, 
-  Calendar, 
-  Zap, 
-  Award, 
-  CheckCircle2, 
-  PlayCircle, 
-  PlusCircle, 
+import {
+  Trophy,
+  Calendar,
+  Zap,
+  Award,
+  CheckCircle2,
+  PlayCircle,
+  PlusCircle,
   RotateCcw,
   Sparkles
 } from 'lucide-react';
@@ -143,7 +143,7 @@ export default function ScheduleStandings({ teams }) {
 
   return (
     <div className="space-y-8">
-      
+
       {/* Top Banner */}
       <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -189,9 +189,8 @@ export default function ScheduleStandings({ teams }) {
                 return (
                   <tr
                     key={team.id}
-                    className={`hover:bg-warm-900/40 transition ${
-                      isTopper ? 'bg-[#c9a227]/10' : isSemi ? 'bg-cricket-emerald/5' : ''
-                    }`}
+                    className={`hover:bg-warm-900/40 transition ${isTopper ? 'bg-[#c9a227]/10' : isSemi ? 'bg-cricket-emerald/5' : ''
+                      }`}
                   >
                     <td className="py-3.5 px-4 font-bold text-sand-200">{idx + 1}</td>
                     <td className="py-3.5 px-4 font-sans font-bold text-white flex items-center space-x-2">
@@ -234,7 +233,7 @@ export default function ScheduleStandings({ teams }) {
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          
+
           {/* Semifinal Match Card */}
           <div className="p-5 rounded-2xl bg-warm-900/80 border border-warm-700/50 space-y-3">
             <div className="flex items-center justify-between text-xs text-[#c9a227] font-bold">

@@ -5,6 +5,32 @@
 
 // Role permissions matrix
 export const ROLES = {
+  suprememaster: {
+    label: 'Supreme Master (App Developer)',
+    badge: '👑 Supreme Master',
+    color: '#a855f7',
+    bgColor: 'bg-purple-500/20',
+    textColor: 'text-purple-300',
+    borderColor: 'border-purple-500/40',
+    permissions: {
+      canBid: false,
+      canSellPlayer: false,
+      canUnsellPlayer: false,
+      canOverrideBid: false,
+      canEditPlayers: false,
+      canAddPlayers: false,
+      canDeletePlayers: false,
+      canResetData: true, // EXCLUSIVELY Supreme Master can clear live auction data from MongoDB Atlas!
+      canManageTeams: false,
+      canManageUsers: true,
+      canViewAuction: true,
+      canViewTeams: true,
+      canViewPlayers: true,
+      canViewRules: true,
+      canViewSchedule: true,
+      canAccessProjector: true,
+    }
+  },
   superuser: {
     label: 'Super Admin',
     badge: '⚡ Super Admin',
@@ -20,7 +46,7 @@ export const ROLES = {
       canEditPlayers: true,
       canAddPlayers: true,
       canDeletePlayers: true,
-      canResetData: true,
+      canResetData: false, // Restricted exclusively to Supreme Master
       canManageTeams: true,
       canManageUsers: true,
       canViewAuction: true,
@@ -40,7 +66,7 @@ export const ROLES = {
     borderColor: 'border-amber-500/40',
     permissions: {
       canBid: true,
-      canSellPlayer: true,
+      canSellPlayer: false, // Super Admin Only
       canUnsellPlayer: false,
       canOverrideBid: false,
       canEditPlayers: false,
@@ -69,7 +95,7 @@ export const ROLES = {
       canSellPlayer: false,
       canUnsellPlayer: false,
       canOverrideBid: false,
-      canEditPlayers: true,        // own profile only
+      canEditPlayers: false,
       canAddPlayers: false,
       canDeletePlayers: false,
       canResetData: false,
@@ -88,9 +114,18 @@ export const ROLES = {
 // Default Credential store (env-based, compared at runtime)
 const DEFAULT_CREDENTIALS = [
   {
+    id: 'usr-supreme-master-default',
+    email: import.meta.env.VITE_SUPREMEMASTER_EMAIL || 'developer@nepl.in',
+    password: import.meta.env.VITE_SUPREMEMASTER_PASS || 'Supreme@Dev2026',
+    role: 'suprememaster',
+    name: 'Supreme Master (App Developer)',
+    avatar: '👑',
+    isDefault: true,
+  },
+  {
     id: 'usr-admin-default',
     email: import.meta.env.VITE_SUPERUSER_EMAIL || 'admin@nepl.in',
-    password: import.meta.env.VITE_SUPERUSER_PASS || 'Nyati@Super2024',
+    password: import.meta.env.VITE_SUPERUSER_PASS || 'Super@dmin2026',
     role: 'superuser',
     name: 'Super Admin',
     avatar: '⚡',

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Users, 
-  Shield, 
-  Award, 
-  ExternalLink, 
-  CheckCircle2, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  X, 
+import {
+  Users,
+  Shield,
+  Award,
+  ExternalLink,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  Edit3,
+  X,
   UserCheck,
   Lock,
 } from 'lucide-react';
@@ -200,7 +200,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-6 rounded-3xl border border-warm-700/50">
         <div>
@@ -245,22 +245,54 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
           return (
             <div
               key={team.id}
-              className="glass-panel p-6 rounded-3xl border border-warm-700/50 space-y-5 relative overflow-hidden flex flex-col justify-between"
+              className="glass-panel p-6 pl-7 rounded-3xl border border-warm-700/50 space-y-5 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 hover:border-warm-600"
             >
-              {/* Team color top bar */}
-              <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: team.color || '#d4622a' }} />
+              {/* 🌟 Glowing Team Color Top Ribbon */}
+              <div
+                className="absolute top-0 left-0 right-0 h-1.5 transition-all duration-300"
+                style={{
+                  backgroundColor: team.color || '#d4622a',
+                  boxShadow: `0 0 20px ${team.color || '#d4622a'}, 0 0 8px ${team.color || '#d4622a'}`
+                }}
+              />
+
+              {/* 🌟 Left Vertical Team Color Ribbon Stripe */}
+              <div
+                className="absolute top-0 bottom-0 left-0 w-2 transition-all duration-300"
+                style={{
+                  backgroundColor: team.color || '#d4622a',
+                  boxShadow: `0 0 15px ${team.color || '#d4622a'}`
+                }}
+              />
 
               <div>
                 {/* Team header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <span className="text-3xl p-2.5 bg-warm-900/80 rounded-2xl border border-warm-700">
+                    <span
+                      className="text-3xl p-2.5 rounded-2xl border transition-all duration-300 shadow-md"
+                      style={{
+                        backgroundColor: `${team.color || '#d4622a'}15`,
+                        borderColor: `${team.color || '#d4622a'}40`
+                      }}
+                    >
                       {team.logo}
                     </span>
                     <div>
                       <h3 className="text-xl font-extrabold text-sand-100 tracking-tight font-serif flex items-center gap-2">
                         {team.name}
-                        <span className="text-xs font-mono text-sand-500 font-normal">({team.shortName})</span>
+                        {/* High Visibility Team Color Ribbon Badge */}
+                        <span
+                          className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border font-mono shadow-sm"
+                          style={{
+                            backgroundColor: `${team.color || '#d4622a'}20`,
+                            color: team.color || '#d4622a',
+                            borderColor: `${team.color || '#d4622a'}50`,
+                            boxShadow: `0 0 12px ${team.color || '#d4622a'}35`
+                          }}
+                        >
+                          {team.shortName}
+                        </span>
                       </h3>
                       <p className="text-xs text-sand-500 font-mono flex items-center gap-1.5 mt-0.5">
                         <UserCheck className="w-3.5 h-3.5 text-[#c9a227]" />
@@ -270,11 +302,10 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <span className={`px-2.5 py-1 rounded-xl text-xs font-extrabold uppercase tracking-wider ${
-                      isFull
+                    <span className={`px-2.5 py-1 rounded-xl text-xs font-extrabold uppercase tracking-wider ${isFull
                         ? 'bg-cricket-emerald/15 text-cricket-emerald border border-cricket-emerald/30'
                         : 'bg-[#c9a227]/15 text-[#c9a227] border border-[#c9a227]/30'
-                    }`}>
+                      }`}>
                       {squad.length}/8
                     </span>
 
@@ -320,7 +351,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                       style={{ width: `${Math.max(0, Math.min(100, (remainingPurse / team.totalPurse) * 100))}%` }}
                     />
                   </div>
-                  
+
                   {/* Free / Release Top Bidded Player Button */}
                   {squad.length > 0 && (can('canBid') || canManage) && (
                     <div className="pt-2 border-t border-warm-800/60 flex items-center justify-between">
@@ -332,7 +363,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                         className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[10px] font-bold tracking-wider uppercase transition shadow-sm"
                         title="Release highest cost player back to auction pool to refund purse"
                       >
-                        ⚡ Release Top Player (Refund ₹{[...squad].sort((a,b)=>(b.soldPrice||0)-(a.soldPrice||0))[0]?.soldPrice || 0})
+                        ⚡ Release Top Player (Refund ₹{[...squad].sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0))[0]?.soldPrice || 0})
                       </button>
                     </div>
                   )}
@@ -419,7 +450,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
       {showModal && canManage && createPortal(
         <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="warm-card w-full max-w-lg p-6 sm:p-8 rounded-3xl border border-warm-700/60 space-y-6 relative max-h-[90vh] overflow-y-auto shadow-2xl my-auto">
-            
+
             <div className="flex items-center justify-between border-b border-warm-700/50 pb-4">
               <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-serif">
                 <Users className="w-5 h-5 text-terracotta-400" />
@@ -434,7 +465,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
                   <label className="text-xs font-semibold text-sand-400 block mb-1.5">Team Name</label>
@@ -506,11 +537,10 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                           key={emoji}
                           type="button"
                           onClick={() => setFormData({ ...formData, logo: emoji })}
-                          className={`p-1 text-sm rounded-lg border transition ${
-                            formData.logo === emoji
+                          className={`p-1 text-sm rounded-lg border transition ${formData.logo === emoji
                               ? 'bg-terracotta-600/30 border-terracotta-500'
                               : 'bg-warm-900 border-warm-800 text-sand-400'
-                          }`}
+                            }`}
                         >
                           {emoji}
                         </button>
@@ -519,43 +549,43 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                   </div>
                 </div>
 
-              {/* Bidding Purse & Squad Capacity (Super Admin Overridable) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-cyan-300 block mb-1.5 font-display flex items-center justify-between">
-                    <span>Purse Budget (PTS)</span>
-                    <span className="text-[9px] text-purple-300 bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/30">Super Admin Config</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={100}
-                    value={formData.totalPurse}
-                    onChange={e => setFormData({ ...formData, totalPurse: e.target.value })}
-                    className="warm-input font-mono"
-                    placeholder="e.g. 10000"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">Super Admin decides starting purse budget for auctioneer/team.</p>
-                </div>
+                {/* Bidding Purse & Squad Capacity (Super Admin Overridable) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-cyan-300 block mb-1.5 font-display flex items-center justify-between">
+                      <span>Purse Budget (PTS)</span>
+                      <span className="text-[9px] text-purple-300 bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/30">Super Admin Config</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={100}
+                      value={formData.totalPurse}
+                      onChange={e => setFormData({ ...formData, totalPurse: e.target.value })}
+                      className="warm-input font-mono"
+                      placeholder="e.g. 10000"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Super Admin decides starting purse budget for auctioneer/team.</p>
+                  </div>
 
-                <div>
-                  <label className="text-xs font-bold text-cyan-300 block mb-1.5 font-display flex items-center justify-between">
-                    <span>Max Squad Capacity</span>
-                    <span className="text-[9px] text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">Default: 8</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    max={30}
-                    value={formData.maxSquadSize}
-                    onChange={e => setFormData({ ...formData, maxSquadSize: e.target.value })}
-                    className="warm-input font-mono"
-                    placeholder="8 (or Super Admin override)"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">Default 8 squad members. Super Admin can override to any capacity.</p>
+                  <div>
+                    <label className="text-xs font-bold text-cyan-300 block mb-1.5 font-display flex items-center justify-between">
+                      <span>Max Squad Capacity</span>
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">Default: 8</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={30}
+                      value={formData.maxSquadSize}
+                      onChange={e => setFormData({ ...formData, maxSquadSize: e.target.value })}
+                      className="warm-input font-mono"
+                      placeholder="8 (or Super Admin override)"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Default 8 squad members. Super Admin can override to any capacity.</p>
+                  </div>
                 </div>
-              </div>
               </div>
 
               {/* Theme Color */}
@@ -569,9 +599,8 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                         key={c}
                         type="button"
                         onClick={() => setFormData({ ...formData, color: c })}
-                        className={`w-7 h-7 rounded-lg border transition ${
-                          formData.color === c ? 'ring-2 ring-white scale-110' : 'border-warm-700'
-                        }`}
+                        className={`w-7 h-7 rounded-lg border transition ${formData.color === c ? 'ring-2 ring-white scale-110' : 'border-warm-700'
+                          }`}
                         style={{ backgroundColor: c }}
                       />
                     ))}

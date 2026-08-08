@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
 import { 
   Gavel, 
@@ -15,10 +16,12 @@ import {
   Pause,
   Lock,
   TrendingUp,
+  X,
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { useAuth } from '../auth/AuthContext';
 import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam, isMongoDB } from '../services/api';
+import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
 
 export default function AuctionRoom({ 
   players, 
@@ -28,7 +31,10 @@ export default function AuctionRoom({
   history, 
   setHistory 
 }) {
-  const { can } = useAuth();
+  const { user, can } = useAuth();
+  const isSuperAdmin = user?.role === 'superuser';
+  const canBid = can('canBid');
+  const canSell = can('canSellPlayer');
 
   const availablePlayers = players.filter(p => p.status === 'available' || p.status === 'unsold');
   
@@ -77,7 +83,7 @@ export default function AuctionRoom({
 
         if (validTeams.length > 0) {
           const randomTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
-          const increment = [50, 100, 200][Math.floor(Math.random() * 3)];
+          const increment = getBidIncrement(currentBid);
           const nextBid = currentBid + increment;
           handlePlaceBid(randomTeam, nextBid);
         } else if (highBidder) {
@@ -90,6 +96,12 @@ export default function AuctionRoom({
 
   const handlePlaceBid = (team, newBidAmount) => {
     if (!activePlayer || activePlayer.status === 'sold') return;
+
+    // 🛑 Round-Robin Rule: No team can successively bid on the player against themselves!
+    if (highBidder && highBidder.id === team.id) {
+      alert(`⚠️ Alternating Bid Rule: ${team.name} is ALREADY the leading bidder! Another team must place a counter-bid before ${team.name} can bid again.`);
+      return;
+    }
 
     if (!newBidAmount || isNaN(newBidAmount) || newBidAmount <= 0) {
       alert("⚠️ Invalid Bid: Bid amount must be a positive number greater than 0!");
@@ -130,10 +142,56 @@ export default function AuctionRoom({
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showReduceModal, setShowReduceModal] = useState(false);
+  const [reducedBidInput, setReducedBidInput] = useState('');
 
   useEffect(() => {
     setIsProcessing(false);
   }, [activePlayerId]);
+
+  const handleAdminRevokeBid = () => {
+    if (!isSuperAdmin || !highBidder || !activePlayer) return;
+    if (window.confirm(`⚡ SUPER ADMIN: Revoke high bid of ₹${currentBid} PTS by ${highBidder.name}?`)) {
+      const baseVal = activePlayer.basePrice;
+      setCurrentBid(baseVal);
+      setHighBidder(null);
+      setHistory(prev => [{
+        id: Date.now().toString(),
+        type: 'ADMIN_REVOKE',
+        playerName: activePlayer.name,
+        teamName: highBidder.name,
+        amount: baseVal,
+        timestamp: new Date().toLocaleTimeString()
+      }, ...prev]);
+    }
+  };
+
+  const handleAdminReduceBidSubmit = (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin || !highBidder || !activePlayer) return;
+    const newPrice = Number(reducedBidInput);
+    if (!newPrice || isNaN(newPrice) || newPrice <= 0) {
+      alert("⚠️ Invalid Amount: Reduced bid must be a positive number greater than 0!");
+      return;
+    }
+    if (newPrice >= currentBid) {
+      alert(`⚠️ Must Be Lower: Reduced bid (₹${newPrice} PTS) must be lower than current bid (₹${currentBid} PTS)!`);
+      return;
+    }
+
+    setCurrentBid(newPrice);
+    setShowReduceModal(false);
+    setReducedBidInput('');
+
+    setHistory(prev => [{
+      id: Date.now().toString(),
+      type: 'ADMIN_REDUCE',
+      playerName: activePlayer.name,
+      teamName: highBidder.name,
+      amount: newPrice,
+      timestamp: new Date().toLocaleTimeString()
+    }, ...prev]);
+  };
 
   const handleMarkSold = () => {
     if (isProcessing) return;
@@ -224,9 +282,6 @@ export default function AuctionRoom({
       setActivePlayerId(unsold[Math.floor(Math.random() * unsold.length)].id);
     }
   };
-
-  const canBid = can('canBid');
-  const canSell = can('canSellPlayer');
 
   return (
     <div className="space-y-6">
@@ -385,15 +440,41 @@ export default function AuctionRoom({
 
                   {/* Leading Bidder */}
                   {highBidder ? (
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-[#c9a227]/15 to-[#c9a227]/5 border border-[#c9a227]/40">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{highBidder.logo}</span>
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#c9a227] block">Leading Bidder</span>
-                          <span className="font-extrabold text-sand-100 text-base">{highBidder.name}</span>
+                    <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#c9a227]/15 to-[#c9a227]/5 border border-[#c9a227]/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{highBidder.logo}</span>
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#c9a227] block">Leading Bidder</span>
+                            <span className="font-extrabold text-sand-100 text-base">{highBidder.name}</span>
+                          </div>
                         </div>
+                        <span className="text-xl font-black text-[#c9a227] font-mono">₹{currentBid} PTS</span>
                       </div>
-                      <span className="text-xl font-black text-[#c9a227] font-mono">₹{currentBid} PTS</span>
+
+                      {/* Super Admin Revoke & Reduce Controls */}
+                      {isSuperAdmin && activePlayer?.status !== 'sold' && (
+                        <div className="flex items-center space-x-2 pt-2 border-t border-[#c9a227]/20">
+                          <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Super Admin:</span>
+                          <button
+                            onClick={handleAdminRevokeBid}
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+                            title="Revoke high bid and reset to base price"
+                          >
+                            ⚡ Revoke Bid
+                          </button>
+                          <button
+                            onClick={() => {
+                              setReducedBidInput(Math.max(activePlayer.basePrice, currentBid - 100));
+                              setShowReduceModal(true);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+                            title="Reduce current bid amount"
+                          >
+                            ✏️ Reduce Bid
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="p-3 text-center rounded-xl bg-warm-900/40 border border-dashed border-warm-700 text-sand-600 text-xs font-mono">
@@ -419,23 +500,55 @@ export default function AuctionRoom({
                 )}
               </div>
 
+              {/* Dynamic Bidding Tier Callout */}
+              {activePlayer && activePlayer.status !== 'sold' && (
+                <div className="p-3.5 rounded-2xl bg-warm-900/90 border border-[#c9a227]/30 flex flex-wrap items-center justify-between gap-2 shadow-inner">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#c9a227] animate-pulse shadow-[0_0_10px_#c9a227]" />
+                    <div>
+                      <span className="text-xs font-bold text-sand-200 block">
+                        Current Bidding Slab: <span className="text-[#c9a227] font-extrabold">{getBidSlabInfo(currentBid).label}</span> ({getBidSlabInfo(currentBid).rangeText})
+                      </span>
+                      <span className="text-[11px] text-sand-500 font-mono">
+                        Rule Minimum Step: <strong className="text-cricket-emerald">+₹{getBidIncrement(currentBid)} PTS</strong>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono text-xs text-sand-400">
+                    Next Standard Bid: <span className="text-cricket-emerald font-extrabold text-sm">₹{(highBidder ? currentBid + getBidIncrement(currentBid) : activePlayer.basePrice).toLocaleString()} PTS</span>
+                  </div>
+                </div>
+              )}
+
               {/* Team Bid Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {teams.map((team) => {
                   const isLeading = highBidder?.id === team.id;
                   const remainingPurse = team.totalPurse - team.spentPurse;
                   const isSquadFull = team.squad?.length >= 8;
-                  const canAfford = remainingPurse >= (highBidder ? currentBid + 50 : activePlayer.basePrice);
+                  const stdInc = getBidIncrement(currentBid);
+                  const canAfford = remainingPurse >= (highBidder ? currentBid + stdInc : activePlayer.basePrice);
+
+                  // Standard dynamic increment + optional quick increments
+                  const increments = Array.from(new Set([stdInc, 100, 200, 500])).sort((a, b) => a - b);
 
                   return (
                     <div
                       key={team.id}
-                      className={`p-4 rounded-2xl border transition-all duration-200 ${
+                      className={`p-4 pl-5 rounded-2xl border transition-all duration-200 relative overflow-hidden ${
                         isLeading
                           ? 'bg-[#c9a227]/10 border-[#c9a227]/50 ring-2 ring-[#c9a227]/20'
                           : 'bg-warm-900/80 border-warm-700/60 hover:border-warm-600'
                       }`}
                     >
+                      {/* Vertical Team Color Ribbon Accent */}
+                      <div 
+                        className="absolute top-0 bottom-0 left-0 w-1.5 transition-all duration-300" 
+                        style={{ 
+                          backgroundColor: team.color || '#d4622a',
+                          boxShadow: `0 0 12px ${team.color || '#d4622a'}` 
+                        }} 
+                      />
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-2.5">
                           <span className="text-xl">{team.logo}</span>
@@ -455,9 +568,10 @@ export default function AuctionRoom({
 
                       {/* Bid increment buttons */}
                       <div className="flex items-center gap-1.5">
-                        {[50, 100, 250, 500].map((inc) => {
+                        {increments.map((inc) => {
+                          const isStandardRuleStep = inc === stdInc;
                           const nextBidVal = highBidder ? currentBid + inc : activePlayer.basePrice;
-                          const isDisabled = !canBid || isLeading || !canAfford || isSquadFull || activePlayer.status === 'sold';
+                          const isDisabled = !canBid || isLeading || remainingPurse < nextBidVal || isSquadFull || activePlayer.status === 'sold';
                           return (
                             <button
                               key={inc}
@@ -469,10 +583,13 @@ export default function AuctionRoom({
                               className={`flex-1 py-2 rounded-xl text-xs font-bold transition font-mono ${
                                 isDisabled
                                   ? 'bg-warm-950 text-sand-700 border border-warm-900 cursor-not-allowed'
-                                  : 'bg-warm-800 hover:bg-cricket-emerald hover:text-warm-950 text-cricket-emerald border border-cricket-emerald/30 active:scale-95'
+                                  : isStandardRuleStep
+                                    ? 'bg-terracotta-600 hover:bg-terracotta-500 text-white border border-terracotta-400 shadow-md scale-[1.02] active:scale-95'
+                                    : 'bg-warm-800 hover:bg-cricket-emerald hover:text-warm-950 text-cricket-emerald border border-cricket-emerald/30 active:scale-95'
                               }`}
+                              title={isStandardRuleStep ? `Standard Tier Rule Step (+₹${inc})` : `Custom Increment (+₹${inc})`}
                             >
-                              +{inc}
+                              +{inc}{isStandardRuleStep ? '⚡' : ''}
                             </button>
                           );
                         })}
@@ -606,6 +723,59 @@ export default function AuctionRoom({
             All players have been processed. Check Teams & Purse or Schedule to review squads and plan your tournament!
           </p>
         </div>
+      )}
+
+      {/* ── Super Admin Reduce Bid Modal ── */}
+      {showReduceModal && createPortal(
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1120] border border-amber-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
+              <h3 className="text-lg font-black text-amber-300 flex items-center gap-2 font-display">
+                <span>⚡ Super Admin: Reduce Bid</span>
+              </h3>
+              <button onClick={() => setShowReduceModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Reduce current bid of <strong className="text-amber-400">₹{currentBid} PTS</strong> for team <strong className="text-white">{highBidder?.name}</strong>:
+            </p>
+
+            <form onSubmit={handleAdminReduceBidSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">New Reduced Bid Amount (PTS)</label>
+                <input
+                  type="number"
+                  min="50"
+                  max={currentBid - 1}
+                  step="50"
+                  value={reducedBidInput}
+                  onChange={(e) => setReducedBidInput(e.target.value)}
+                  className="w-full bg-slate-900 border border-amber-500/30 rounded-xl px-4 py-2.5 text-white font-mono text-lg font-bold focus:outline-none focus:border-amber-400"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReduceModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
+                >
+                  Confirm Reduce Bid
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -164,17 +164,6 @@ export default function Header({
               </button>
             )}
 
-            {/* Reset — superuser only */}
-            {can('canResetData') && (
-              <button
-                onClick={onResetData}
-                className="p-2.5 rounded-xl bg-slate-950 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-slate-800 hover:border-rose-500/40 transition"
-                title="Reset Auction Data"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            )}
-
             {/* User Menu */}
             {user && (
               <div className="relative">
@@ -207,16 +196,30 @@ export default function Header({
                     {can('canManageUsers') && (
                       <button
                         onClick={() => { setIsManagerOpen(true); setShowUserMenu(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-slate-300 hover:bg-slate-800/80 hover:text-cyan-300 transition mb-1"
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-slate-300 hover:bg-slate-800/80 hover:text-cyan-300 transition mb-1 cursor-pointer"
                       >
                         <UserCheck className="w-4 h-4 text-purple-400" />
                         Manage Auctioneers
                       </button>
                     )}
 
+                    {can('canResetData') && (
+                      <button
+                        onClick={() => {
+                          onResetData?.();
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-400 font-bold hover:bg-rose-950/60 hover:text-rose-200 transition border border-rose-500/30 mb-1 cursor-pointer"
+                        title="Clear all live auction data, bids, and teams from MongoDB Atlas (Supreme Master Only)"
+                      >
+                        <RotateCcw className="w-4 h-4 text-rose-400" />
+                        <span>Clear Database (Supreme Master)</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => { logout(); setShowUserMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" />
                       Sign out

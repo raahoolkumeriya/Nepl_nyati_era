@@ -12,17 +12,21 @@ import {
   X,
   Filter,
   Lock,
+  Edit3,
   Trash2,
   Camera,
   Upload,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { compressImage } from '../utils/imageCompressor';
+import { updatePlayer as apiUpdatePlayer } from '../services/api';
 
 export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
-  const { can } = useAuth();
-  const canAdd = can('canAddPlayers');
-  const canDelete = can('canDeletePlayers');
+  const { user, can } = useAuth();
+  const isSuperAdmin = user?.role === 'superuser';
+  const canAdd = isSuperAdmin || can('canAddPlayers');
+  const canEdit = isSuperAdmin || can('canEditPlayers');
+  const canDelete = isSuperAdmin || can('canDeletePlayers');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
@@ -36,7 +40,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     name: '',
     role: 'Batting All-Rounder',
     category: 'Category B',
-    basePrice: 300,
+    basePrice: 100,
     matches: 10,
     runs: 150,
     avg: 15.0,
@@ -47,6 +51,51 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     cricHeroesUrl: 'https://cricheroes.com',
     avatarUrl: '/avatars/male.png'
   });
+
+  // Super Admin Edit Player State
+  const [editingPlayer, setEditingPlayer] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    role: 'Batting All-Rounder',
+    category: 'Category B',
+    basePrice: 100,
+    cricHeroesUrl: 'https://cricheroes.com',
+  });
+
+  const openEditPlayerModal = (player) => {
+    setEditingPlayer(player);
+    setEditFormData({
+      name: player.name,
+      role: player.role,
+      category: player.category || 'Category B',
+      basePrice: player.basePrice || 100,
+      cricHeroesUrl: player.cricHeroesUrl || 'https://cricheroes.com',
+    });
+  };
+
+  const handleEditPlayerSubmit = (e) => {
+    e.preventDefault();
+    if (!editingPlayer || !editFormData.name.trim()) return;
+
+    const basePrice = Number(editFormData.basePrice);
+    if (!basePrice || isNaN(basePrice) || basePrice <= 0) {
+      alert("⚠️ Invalid Base Price: Base price must be a positive number greater than 0!");
+      return;
+    }
+
+    const updatedPlayer = {
+      ...editingPlayer,
+      name: editFormData.name.trim(),
+      role: editFormData.role,
+      category: editFormData.category,
+      basePrice: Math.max(50, basePrice),
+      cricHeroesUrl: editFormData.cricHeroesUrl.trim(),
+    };
+
+    setPlayers(prev => prev.map(p => p.id === editingPlayer.id ? updatedPlayer : p));
+    apiUpdatePlayer(editingPlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player edit error:', err));
+    setEditingPlayer(null);
+  };
 
   const filteredPlayers = players.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -110,7 +159,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
       name: '',
       role: 'Batting All-Rounder',
       category: 'Category B',
-      basePrice: 300,
+      basePrice: 100,
       matches: 10,
       runs: 150,
       avg: 15.0,
@@ -273,16 +322,27 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                     </div>
                   </div>
 
-                  {/* Super Admin Delete Player Button */}
-                  {canDelete && (
-                    <button
-                      onClick={() => handleDeletePlayer(player)}
-                      className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition shrink-0 ml-1"
-                      title={`Delete ${player.name}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  {/* Super Admin Edit & Delete Player Buttons */}
+                  <div className="flex items-center space-x-1 shrink-0 ml-1">
+                    {canEdit && (
+                      <button
+                        onClick={() => openEditPlayerModal(player)}
+                        className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border border-warm-700/60 hover:border-amber-500/40 transition cursor-pointer"
+                        title={`Edit ${player.name}`}
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeletePlayer(player)}
+                        className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition cursor-pointer"
+                        title={`Delete ${player.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Stats grid */}
@@ -308,9 +368,17 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                 </div>
                 <div>
                   {player.status === 'sold' && buyerTeam ? (
-                    <span className="badge-sold">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {buyerTeam.shortName} ₹{player.soldPrice}
+                    <span 
+                      className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border flex items-center space-x-1.5 font-mono shadow-md"
+                      style={{ 
+                        backgroundColor: `${buyerTeam.color || '#10b981'}20`, 
+                        color: buyerTeam.color || '#10b981',
+                        borderColor: `${buyerTeam.color || '#10b981'}50`,
+                        boxShadow: `0 0 10px ${buyerTeam.color || '#10b981'}35`
+                      }}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{buyerTeam.logo} {buyerTeam.shortName} ₹{player.soldPrice}</span>
                     </span>
                   ) : player.status === 'unsold' ? (
                     <span className="badge-unsold">
@@ -387,24 +455,23 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                     onChange={e => {
                       const cat = e.target.value;
                       let defaultAvatar = '/avatars/male.png';
-                      let defaultBase = 300;
-                      if (cat === 'Female') { defaultAvatar = '/avatars/female.png'; defaultBase = 400; }
-                      else if (cat === 'Master (7-10 yrs)') { defaultAvatar = '/avatars/master.png'; defaultBase = 200; }
-                      else if (cat === 'Super Master (11-13 yrs)') { defaultAvatar = '/avatars/super_master.png'; defaultBase = 300; }
-                      else if (cat === 'Icon') { defaultBase = 500; }
-                      else if (cat === 'Category A') { defaultBase = 400; }
+                      let defaultBase = 100;
+                      if (cat === 'Female') { defaultAvatar = '/avatars/female.png'; defaultBase = 100; }
+                      else if (cat === 'Master (7-10 yrs)') { defaultAvatar = '/avatars/master.png'; defaultBase = 100; }
+                      else if (cat === 'Super Master (11-13 yrs)') { defaultAvatar = '/avatars/super_master.png'; defaultBase = 100; }
+                      else if (cat === 'Icon') { defaultBase = 300; }
+                      else if (cat === 'Category A') { defaultBase = 200; }
                       setNewPlayer({ ...newPlayer, category: cat, avatarUrl: defaultAvatar, basePrice: defaultBase });
                     }} 
-                    className="warm-input"
+                    className="warm-input cursor-pointer"
                   >
-                    <option value="Male">Male (Adult)</option>
-                    <option value="Female">Female (Adult)</option>
-                    <option value="Master (7-10 yrs)">Master (7-10 yrs)</option>
-                    <option value="Super Master (11-13 yrs)">Super Master (11-13 yrs)</option>
-                    <option value="Icon">Icon (Base: 500 PTS)</option>
-                    <option value="Category A">Category A (400 PTS)</option>
-                    <option value="Category B">Category B (300 PTS)</option>
-                    <option value="Category C">Category C (200 PTS)</option>
+                    <option value="Male">Male (Adult) — Base: 100 PTS</option>
+                    <option value="Female">Female (Adult) — Base: 100 PTS</option>
+                    <option value="Master (7-10 yrs)">Master (7-10 yrs) — Base: 100 PTS</option>
+                    <option value="Super Master (11-13 yrs)">Super Master (11-13 yrs) — Base: 100 PTS</option>
+                    <option value="Category B">Category B (Default Base: 100 PTS)</option>
+                    <option value="Category A">Category A (Base: 200 PTS)</option>
+                    <option value="Icon">Icon (Base: 300 PTS)</option>
                   </select>
                 </div>
                 <div>
@@ -521,6 +588,112 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
               </div>
             </form>
 
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Super Admin Edit Player Modal ── */}
+      {editingPlayer && createPortal(
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1120] border border-cyan-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
+              <h3 className="text-lg font-black text-cyan-300 flex items-center gap-2 font-display">
+                <Edit3 className="w-5 h-5 text-cyan-400" />
+                <span>⚡ Super Admin: Edit Player Profile</span>
+              </h3>
+              <button onClick={() => setEditingPlayer(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditPlayerSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Player Full Name</label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white font-bold focus:outline-none focus:border-cyan-400 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Role</label>
+                  <select
+                    value={editFormData.role}
+                    onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="Batting All-Rounder">Batting All-Rounder</option>
+                    <option value="Bowling All-Rounder">Bowling All-Rounder</option>
+                    <option value="Pure Batsman">Pure Batsman</option>
+                    <option value="Wicketkeeper Batsman">Wicketkeeper Batsman</option>
+                    <option value="Fast Bowler">Fast Bowler</option>
+                    <option value="Spin Bowler">Spin Bowler</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Category</label>
+                  <select
+                    value={editFormData.category}
+                    onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Super Master">Super Master</option>
+                    <option value="Master">Master</option>
+                    <option value="Category A">Category A</option>
+                    <option value="Category B">Category B</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Base Price (PTS)</label>
+                  <input
+                    type="number"
+                    min="50"
+                    step="50"
+                    value={editFormData.basePrice}
+                    onChange={(e) => setEditFormData({ ...editFormData, basePrice: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm font-bold focus:outline-none focus:border-cyan-400"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">CricHeroes Profile URL</label>
+                  <input
+                    type="url"
+                    value={editFormData.cricHeroesUrl}
+                    onChange={(e) => setEditFormData({ ...editFormData, cricHeroesUrl: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlayer(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
+                >
+                  Save Player Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

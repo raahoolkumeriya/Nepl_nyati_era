@@ -1,16 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   BookOpen, Trophy, Gavel, Clock, Users, ShieldAlert, XCircle, 
-  Zap, UserCheck, Gift, CloudRain, UtensilsCrossed, Plus, Trash2, X, Lock, Database,
+  Zap, UserCheck, Gift, CloudRain, UtensilsCrossed, Plus, Trash2, X, Lock, Database, Edit3,
 } from 'lucide-react';
 import { TOURNAMENT_RULES } from '../data/initialData';
 import { useAuth } from '../auth/AuthContext';
 import { addRule as apiAddRule, deleteRule as apiDeleteRule, isMongoDB } from '../services/api';
 
 export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
-  const { can } = useAuth();
-  const canManage = can('canResetData') || can('canManageUsers');
+  const { user, can } = useAuth();
+  const isSuperAdmin = user?.role === 'superuser';
+  const canManage = isSuperAdmin || can('canResetData') || can('canManageUsers');
+
+  // ── Persistent Official Prize Pool State ───────────────────────────────────
+  const [prizePool, setPrizePool] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nepl_prize_pool');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load saved prize pool:', e);
+    }
+    const prizeRule = rules.find(r => r.id === 'rule-prizepool' || r.title === 'OFFICIAL PRIZE POOL');
+    if (prizeRule && prizeRule.prizeData) {
+      return prizeRule.prizeData;
+    }
+    return {
+      winner: '2,500',
+      runnerUp: '1,500',
+      playerOfTournament: '500',
+      currency: 'INR',
+    };
+  });
+
+  const [showPrizeModal, setShowPrizeModal] = useState(false);
+  const [prizeFormData, setPrizeFormData] = useState(prizePool);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRule, setNewRule] = useState({
@@ -23,6 +47,65 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
   const iconMap = { 
     BookOpen, Trophy, Gavel, Clock, Users, ShieldAlert, XCircle, 
     Zap, UserCheck, Gift, CloudRain, UtensilsCrossed 
+  };
+
+  const openPrizeModal = () => {
+    setPrizeFormData(prizePool);
+    setShowPrizeModal(true);
+  };
+
+  const handleSavePrizePool = async (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin) return;
+
+    const winnerVal = prizeFormData.winner.trim() || '2,500';
+    const runnerVal = prizeFormData.runnerUp.trim() || '1,500';
+    const potVal = prizeFormData.playerOfTournament.trim() || '500';
+    const currVal = prizeFormData.currency.trim() || 'INR';
+
+    const updatedPrizePool = {
+      winner: winnerVal,
+      runnerUp: runnerVal,
+      playerOfTournament: potVal,
+      currency: currVal,
+    };
+
+    // 1. Update React State
+    setPrizePool(updatedPrizePool);
+
+    // 2. Persist to localStorage
+    try {
+      localStorage.setItem('nepl_prize_pool', JSON.stringify(updatedPrizePool));
+    } catch (err) {
+      console.warn('LocalStorage prize pool save error:', err);
+    }
+
+    // 3. Persist to MongoDB Atlas rules collection as a special Rule document
+    const prizeRuleDoc = {
+      id: 'rule-prizepool',
+      number: '00',
+      title: 'OFFICIAL PRIZE POOL',
+      desc: `WINNER: ${currVal} ${winnerVal}/- | RUNNER UP: ${currVal} ${runnerVal}/- | MAN OF TOURNAMENT: ${currVal} ${potVal}/-`,
+      icon: 'Gift',
+      prizeData: updatedPrizePool,
+    };
+
+    if (setRules) {
+      setRules(prev => {
+        const filtered = prev.filter(r => r.id !== 'rule-prizepool' && r.title !== 'OFFICIAL PRIZE POOL');
+        return [prizeRuleDoc, ...filtered];
+      });
+    }
+
+    if (isMongoDB) {
+      try {
+        await apiAddRule(prizeRuleDoc);
+      } catch (err) {
+        console.warn('Direct MongoDB prize pool save fallback:', err);
+      }
+    }
+
+    setShowPrizeModal(false);
   };
 
   const handleAddRuleSubmit = async (e) => {
@@ -107,27 +190,49 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
             {canManage && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl bg-terracotta-600 hover:bg-terracotta-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-terracotta-600/20 transition"
+                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl bg-terracotta-600 hover:bg-terracotta-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-terracotta-600/20 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Rule</span>
               </button>
             )}
 
-            {/* Prize Card */}
-            <div className="bg-gradient-to-tr from-[#c9a227]/20 via-[#c9a227]/10 to-[#c9a227]/25 p-5 rounded-2xl border border-[#c9a227]/40 shadow-xl flex items-center space-x-4 min-w-[240px]">
-              <div className="p-3 bg-[#c9a227] text-warm-950 rounded-xl font-bold shadow-lg">
-                <Gift className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-extrabold text-[#c9a227] tracking-wider block">Official Prize Pool</span>
-                <div className="text-sm font-bold text-sand-100 mt-0.5">
-                  WINNER: <span className="text-cricket-emerald font-mono font-extrabold">INR 2,500/-</span>
+            {/* Official Prize Pool Card */}
+            <div className="bg-gradient-to-tr from-[#c9a227]/25 via-[#c9a227]/15 to-[#c9a227]/30 p-5 rounded-2xl border border-[#c9a227]/40 shadow-xl flex items-center justify-between min-w-[260px] relative overflow-hidden">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-[#c9a227] text-warm-950 rounded-xl font-bold shadow-lg flex-shrink-0">
+                  <Gift className="w-6 h-6" />
                 </div>
-                <div className="text-xs text-sand-400 font-medium">
-                  RUNNER UP: <span className="text-[#c9a227] font-mono font-extrabold">INR 1,500/-</span>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] uppercase font-extrabold text-[#c9a227] tracking-wider block">Official Prize Pool</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
+                  </div>
+                  <div className="text-sm font-bold text-sand-100 mt-0.5 font-mono">
+                    WINNER: <span className="text-cricket-emerald font-extrabold">{prizePool.currency} {prizePool.winner}/-</span>
+                  </div>
+                  <div className="text-xs text-sand-300 font-medium font-mono">
+                    RUNNER UP: <span className="text-[#c9a227] font-extrabold">{prizePool.currency} {prizePool.runnerUp}/-</span>
+                  </div>
+                  {prizePool.playerOfTournament && (
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      MAN OF TOURNAMENT: <span className="text-cyan-300 font-extrabold">{prizePool.currency} {prizePool.playerOfTournament}/-</span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Super Admin Edit Prize Pool Button */}
+              {isSuperAdmin && (
+                <button
+                  onClick={openPrizeModal}
+                  className="p-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition shrink-0 ml-3 cursor-pointer flex items-center space-x-1"
+                  title="Edit Official Prize Pool"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Edit</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -160,6 +265,40 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
             <p className="text-xs text-sand-400 mt-1">
               Finals wrap by Sunday 8 PM followed by a grand community <strong className="text-sand-200">Dinner Party</strong>!
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tiered Bidding Slabs Banner */}
+      <div className="glass-panel p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/20 shadow-lg">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center space-x-3">
+            <div className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/40 shrink-0">
+              <Gavel className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sand-100 text-sm flex items-center gap-2 font-display">
+                Official Tiered Bidding Increments
+                <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] uppercase tracking-wider border border-cyan-500/40">Live Rule</span>
+              </h4>
+              <p className="text-xs text-sand-400 mt-0.5">
+                Bidding increments scale dynamically based on the player's current high bid price:
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5 text-center font-mono text-xs shrink-0">
+            <div className="p-2.5 rounded-xl bg-warm-900/90 border border-emerald-500/30">
+              <span className="text-[10px] text-sand-400 block">Up to ₹1,000</span>
+              <span className="text-emerald-400 font-black">+₹100 PTS</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-warm-900/90 border border-cyan-500/30">
+              <span className="text-[10px] text-sand-400 block">₹1,000 – ₹3,000</span>
+              <span className="text-cyan-300 font-black">+₹200 PTS</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-warm-900/90 border border-amber-500/30">
+              <span className="text-[10px] text-sand-400 block">Above ₹3,000</span>
+              <span className="text-amber-300 font-black">+₹300 PTS+</span>
+            </div>
           </div>
         </div>
       </div>
@@ -206,6 +345,100 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
         })}
       </div>
 
+      {/* ── Super Admin Edit Prize Pool Modal ── */}
+      {showPrizeModal && isSuperAdmin && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0b1120] border border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 my-auto">
+            <div className="flex items-center justify-between border-b border-amber-500/20 pb-4">
+              <h3 className="text-xl font-black text-amber-300 flex items-center gap-2 font-display">
+                <Gift className="w-6 h-6 text-amber-400" />
+                <span>⚡ Super Admin: Edit Official Prize Pool</span>
+              </h3>
+              <button
+                onClick={() => setShowPrizeModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-900 border border-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePrizePool} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Currency Prefix</label>
+                  <input
+                    type="text"
+                    required
+                    value={prizeFormData.currency}
+                    onChange={e => setPrizeFormData({ ...prizeFormData, currency: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-emerald-400 mb-1">Winner Prize Amount</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="2,500"
+                    value={prizeFormData.winner}
+                    onChange={e => setPrizeFormData({ ...prizeFormData, winner: e.target.value })}
+                    className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-emerald-300 font-mono font-extrabold text-base"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-amber-400 mb-1">Runner Up Prize Amount</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="1,500"
+                    value={prizeFormData.runnerUp}
+                    onChange={e => setPrizeFormData({ ...prizeFormData, runnerUp: e.target.value })}
+                    className="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-amber-300 font-mono font-extrabold text-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-cyan-400 mb-1">Man of Tournament Prize</label>
+                  <input
+                    type="text"
+                    placeholder="500"
+                    value={prizeFormData.playerOfTournament}
+                    onChange={e => setPrizeFormData({ ...prizeFormData, playerOfTournament: e.target.value })}
+                    className="w-full bg-slate-900 border border-cyan-500/40 rounded-xl px-3 py-2 text-cyan-300 font-mono font-extrabold text-base"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-xs text-slate-400">
+                <span className="text-amber-400 font-bold block mb-1">Live Database Synchronization:</span>
+                Saving will instantly update the official prize pool card and persist the record to MongoDB Atlas.
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowPrizeModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-xl cursor-pointer"
+                >
+                  Save Prize Pool to MongoDB
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── Super Admin Add Rule Modal ── */}
       {showAddModal && canManage && createPortal(
         <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
@@ -218,7 +451,7 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg text-sand-500 hover:text-sand-200 bg-warm-900 border border-warm-700"
+                className="p-1.5 rounded-lg text-sand-500 hover:text-sand-200 bg-warm-900 border border-warm-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -286,11 +519,11 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="btn-secondary"
+                  className="btn-secondary cursor-pointer"
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary cursor-pointer">
                   <Plus className="w-4 h-4" />
                   Save Rule to MongoDB Atlas
                 </button>

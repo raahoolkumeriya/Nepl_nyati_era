@@ -21,7 +21,7 @@ import {
 
 // ─── Inner App (needs Auth context) ─────────────────────────────────────────
 function AppInner() {
-  const { isAuthenticated, can } = useAuth();
+  const { user, isAuthenticated, can } = useAuth();
   const [activeTab, setActiveTab] = useState('auction');
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -149,26 +149,49 @@ function AppInner() {
     return () => clearTimeout(timer);
   }, [rules, isDbConnected, isLoading]);
 
-  // ── Reset data ────────────────────────────────────────────────────────────
+  // ── Reset data (Restricted Exclusively to Supreme Master) ─────────────────────
   const handleResetData = useCallback(async () => {
-    if (window.confirm("Clear all live auction data, bids, and teams from MongoDB Atlas?")) {
-      setTeams([]);
-      setPlayers([]);
-      setHistory([]);
-      setRules(TOURNAMENT_RULES);
-      localStorage.removeItem('nepl_teams');
-      localStorage.removeItem('nepl_players');
-      localStorage.removeItem('nepl_history');
-      localStorage.removeItem('nepl_rules');
-      if (isMongoDB) {
-        try {
-          await Promise.all([savePlayers([]), saveTeams([]), saveHistory([])]);
-        } catch (err) {
-          console.warn('Reset MongoDB error:', err);
+    if (!user || user.role !== 'suprememaster') {
+      alert("⛔ ACCESS DENIED: Only Supreme Master (App Developer) profile can clear live auction data from MongoDB Atlas!");
+      return;
+    }
+
+    const input = window.prompt(
+      "⚠️ DANGER ZONE: YOU ARE ABOUT TO ERASE ALL LIVE AUCTION DATA FROM MONGODB ATLAS!\n\n" +
+      "This will permanently purge:\n" +
+      "• All registered teams & purse records\n" +
+      "• All player pool rosters & sold histories\n" +
+      "• All live auction bid logs\n\n" +
+      "To confirm this action, type the exact phrase below:\n" +
+      "RESET NEPL 2026 MONGODB DATA"
+    );
+
+    if (input === "RESET NEPL 2026 MONGODB DATA") {
+      if (window.confirm("🔴 FINAL WARNING: Confirm permanent deletion of all live auction & team data from MongoDB Atlas?")) {
+        setTeams([]);
+        setPlayers([]);
+        setHistory([]);
+        setRules(TOURNAMENT_RULES);
+        localStorage.removeItem('nepl_teams');
+        localStorage.removeItem('nepl_players');
+        localStorage.removeItem('nepl_history');
+        localStorage.removeItem('nepl_rules');
+        if (isMongoDB) {
+          try {
+            await Promise.all([savePlayers([]), saveTeams([]), saveHistory([])]);
+            alert("✅ MongoDB Atlas database successfully cleared by Supreme Master.");
+          } catch (err) {
+            console.warn('Reset MongoDB error:', err);
+            alert("⚠️ Failed to reset MongoDB database: " + err.message);
+          }
+        } else {
+          alert("✅ Local storage database successfully cleared by Supreme Master.");
         }
       }
+    } else if (input !== null) {
+      alert("❌ DATABASE RESET CANCELLED: Confirmation passphrase did not match!");
     }
-  }, []);
+  }, [user]);
 
   // ── Show login page if not authenticated ──────────────────────────────────
   if (!isAuthenticated) {

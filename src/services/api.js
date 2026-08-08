@@ -12,7 +12,7 @@
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
-const API_KEY = import.meta.env.VITE_API_KEY || 'TTBPq1o0KhaMicvxAvuyT3Q23qr51XgabEorbqA-kwo';
+const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 /** Generic HTTP helper */
 async function apiFetch(path, options = {}) {
