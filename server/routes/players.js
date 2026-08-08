@@ -38,7 +38,21 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT update player
+// PUT bulk replace all players (used on save) - MUST come BEFORE /:id
+router.put('/', async (req, res) => {
+  try {
+    const players = req.body;
+    await Player.deleteMany({});
+    if (Array.isArray(players) && players.length > 0) {
+      await Player.insertMany(players, { ordered: false });
+    }
+    res.json({ success: true, count: Array.isArray(players) ? players.length : 0 });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT update single player
 router.put('/:id', async (req, res) => {
   try {
     const player = await Player.findOneAndUpdate(
@@ -48,20 +62,6 @@ router.put('/:id', async (req, res) => {
     );
     const { _id, __v, ...p } = player;
     res.json(p);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// PUT bulk replace all players (used on save)
-router.put('/', async (req, res) => {
-  try {
-    const players = req.body;
-    await Player.deleteMany({});
-    if (players.length > 0) {
-      await Player.insertMany(players, { ordered: false });
-    }
-    res.json({ success: true, count: players.length });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

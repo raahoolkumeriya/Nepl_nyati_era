@@ -90,11 +90,8 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
       setTeams(prev => prev.map(t => t.id === editingTeam.id ? updatedTeam : t));
 
       // 2. Persist directly to MongoDB Atlas
-      if (isMongoDB) {
-        apiUpdateTeam(editingTeam.id, updatedTeam).catch(err => console.warn('MongoDB team edit error:', err));
-      }
+      apiUpdateTeam(editingTeam.id, updatedTeam).catch(err => console.warn('MongoDB team edit error:', err));
     } else {
-      // Create new team
       const newTeam = {
         id: `team-${Date.now()}`,
         name: formData.name.trim(),
@@ -111,14 +108,12 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
         playersCount: 0,
         squad: [],
       };
-      
+
       // 1. Update React state
       setTeams(prev => [...prev, newTeam]);
 
       // 2. Persist directly to MongoDB Atlas
-      if (isMongoDB) {
-        apiUpdateTeam(newTeam.id, newTeam).catch(err => console.warn('MongoDB team create error:', err));
-      }
+      apiUpdateTeam(newTeam.id, newTeam).catch(err => console.warn('MongoDB team create error:', err));
     }
 
     setShowModal(false);
@@ -127,7 +122,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
   const handleDeleteTeam = (teamToDelete) => {
     if (!canManage) return;
     if (window.confirm(`Are you sure you want to delete team "${teamToDelete.name}"? All acquired squad members will be returned to the Available pool.`)) {
-      // 1. Remove team
+      // 1. Remove team from React state
       setTeams(prev => prev.filter(t => t.id !== teamToDelete.id));
 
       // 2. Return sold players to available pool
@@ -146,9 +141,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
       }
 
       // 3. Delete directly from MongoDB Atlas
-      if (isMongoDB) {
-        apiDeleteTeam(teamToDelete.id).catch(err => console.warn('MongoDB team delete error:', err));
-      }
+      apiDeleteTeam(teamToDelete.id).catch(err => console.warn('MongoDB team delete error:', err));
     }
   };
 
@@ -195,9 +188,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
         }));
       }
 
-      if (isMongoDB) {
-        apiUpdateTeam(team.id, updatedTeam).catch(err => console.warn('MongoDB release player error:', err));
-      }
+      apiUpdateTeam(team.id, updatedTeam).catch(err => console.warn('MongoDB release player error:', err));
     }
   };
 

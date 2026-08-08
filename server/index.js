@@ -54,48 +54,43 @@ app.use((req, res, next) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+// ── Start Express Server Immediately (Render compatibility) ──────────────────
+app.listen(PORT, () => {
+  console.log(`\n🚀  NEPL Server running on port ${PORT} (API at /api)`);
+});
+
 // ── MongoDB Connection & Auto-Seeding ─────────────────────────────────────────
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI || MONGODB_URI.includes('cluster0.example.mongodb.net')) {
   console.error('\n╔════════════════════════════════════════════════════════╗');
   console.error('║  ⚠️  MongoDB URI not configured!                        ║');
-  console.error('║                                                          ║');
-  console.error('║  1. Go to MongoDB Atlas → Connect →                      ║');
-  console.error('║     "Connect your application" → Node.js / Mongoose      ║');
-  console.error('║  2. Copy the connection string                            ║');
-  console.error('║  3. Paste it as MONGODB_URI in your .env file            ║');
+  console.error('║  Paste your MONGODB_URI in environment variables.       ║');
   console.error('╚════════════════════════════════════════════════════════╝\n');
-  process.exit(1);
-}
+} else {
+  mongoose.connect(MONGODB_URI, {
+    dbName: 'nepl_cricket',
+  })
+  .then(async () => {
+    console.log('✅  Connected to MongoDB Atlas (nepl_cricket database)');
 
-mongoose.connect(MONGODB_URI, {
-  dbName: 'nepl_cricket',
-})
-.then(async () => {
-  console.log('\n✅  Connected to MongoDB Atlas (nepl_cricket database)');
-  console.log(`🚀  NEPL API Server running at http://localhost:${PORT}/api`);
-
-  // Auto-seed rules collection in MongoDB if empty
-  try {
-    const existingRulesCount = await Rule.countDocuments();
-    if (existingRulesCount === 0) {
-      await Rule.insertMany(DEFAULT_RULES);
-      console.log(`📌  Seeded ${DEFAULT_RULES.length} tournament rules into MongoDB Atlas (rules collection)\n`);
-    } else {
-      console.log(`📌  MongoDB Atlas contains ${existingRulesCount} tournament rules\n`);
+    // Auto-seed rules collection in MongoDB if empty
+    try {
+      const existingRulesCount = await Rule.countDocuments();
+      if (existingRulesCount === 0) {
+        await Rule.insertMany(DEFAULT_RULES);
+        console.log(`📌  Seeded ${DEFAULT_RULES.length} tournament rules into MongoDB Atlas (rules collection)\n`);
+      } else {
+        console.log(`📌  MongoDB Atlas contains ${existingRulesCount} tournament rules\n`);
+      }
+    } catch (err) {
+      console.warn('⚠️  Rule auto-seed warning:', err.message);
     }
-  } catch (err) {
-    console.warn('⚠️  Rule auto-seed warning:', err.message);
-  }
-
-  app.listen(PORT);
-})
-.catch(err => {
-  console.error('❌  MongoDB connection failed:', err.message);
-  console.error('\nCheck your MONGODB_URI in the .env file');
-  process.exit(1);
-});
+  })
+  .catch(err => {
+    console.error('❌  MongoDB connection failed:', err.message);
+  });
+}
 
 mongoose.connection.on('disconnected', () => {
   console.warn('⚠️  MongoDB disconnected. Attempting to reconnect...');

@@ -154,10 +154,8 @@ export default function AuctionRoom({
       t.id === buyerTeamId ? updatedTeam : t
     ));
 
-    if (isMongoDB) {
-      apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player sold update err:', err));
-      apiUpdateTeam(buyerTeamId, updatedTeam).catch(err => console.warn('MongoDB team sold update err:', err));
-    }
+    apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player sold update err:', err));
+    apiUpdateTeam(buyerTeamId, updatedTeam).catch(err => console.warn('MongoDB team sold update err:', err));
 
     setHistory(prev => [{
       id: Date.now().toString(),
@@ -179,9 +177,7 @@ export default function AuctionRoom({
     soundFx.playUnsold();
     const updatedPlayer = { ...activePlayer, status: 'unsold' };
     setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updatedPlayer : p));
-    if (isMongoDB) {
-      apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player unsold update err:', err));
-    }
+    apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player unsold update err:', err));
     setHistory(prev => [{
       id: Date.now().toString(),
       type: 'UNSOLD',

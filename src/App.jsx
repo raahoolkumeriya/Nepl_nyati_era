@@ -26,6 +26,7 @@ function AppInner() {
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDbConnected, setIsDbConnected] = useState(false);
 
   useEffect(() => {
     soundFx.enabled = soundEnabled;
@@ -73,6 +74,7 @@ function AppInner() {
     async function loadFromMongoDB() {
       try {
         const serverUp = await checkServerHealth();
+        setIsDbConnected(serverUp);
         
         if (serverUp) {
           const [dbPlayers, dbTeams, dbHistory, dbRules] = await Promise.all([
@@ -114,30 +116,38 @@ function AppInner() {
     try { localStorage.setItem('nepl_rules', JSON.stringify(rules)); } catch {}
   }, [rules]);
 
-  // ── Persist to MongoDB (debounced) ────────────────────────────────────────
+  // ── Persist to MongoDB Atlas (debounced) ──────────────────────────────────
   useEffect(() => {
-    if (!isMongoDB || isLoading) return;
-    const timer = setTimeout(() => saveTeams(teams), 800);
+    if (!isDbConnected || isLoading) return;
+    const timer = setTimeout(() => {
+      saveTeams(teams).catch(err => console.warn('Save teams to MongoDB failed:', err));
+    }, 500);
     return () => clearTimeout(timer);
-  }, [teams, isLoading]);
+  }, [teams, isDbConnected, isLoading]);
 
   useEffect(() => {
-    if (!isMongoDB || isLoading) return;
-    const timer = setTimeout(() => savePlayers(players), 800);
+    if (!isDbConnected || isLoading) return;
+    const timer = setTimeout(() => {
+      savePlayers(players).catch(err => console.warn('Save players to MongoDB failed:', err));
+    }, 500);
     return () => clearTimeout(timer);
-  }, [players, isLoading]);
+  }, [players, isDbConnected, isLoading]);
 
   useEffect(() => {
-    if (!isMongoDB || isLoading) return;
-    const timer = setTimeout(() => saveHistory(history), 800);
+    if (!isDbConnected || isLoading) return;
+    const timer = setTimeout(() => {
+      saveHistory(history).catch(err => console.warn('Save history to MongoDB failed:', err));
+    }, 500);
     return () => clearTimeout(timer);
-  }, [history, isLoading]);
+  }, [history, isDbConnected, isLoading]);
 
   useEffect(() => {
-    if (!isMongoDB || isLoading) return;
-    const timer = setTimeout(() => saveRules(rules), 800);
+    if (!isDbConnected || isLoading) return;
+    const timer = setTimeout(() => {
+      saveRules(rules).catch(err => console.warn('Save rules to MongoDB failed:', err));
+    }, 500);
     return () => clearTimeout(timer);
-  }, [rules, isLoading]);
+  }, [rules, isDbConnected, isLoading]);
 
   // ── Reset data ────────────────────────────────────────────────────────────
   const handleResetData = useCallback(async () => {
