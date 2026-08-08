@@ -46,28 +46,8 @@ export async function checkServerHealth() {
   }
 }
 
-/**
- * initializeWithDefaults — seeds the database with default players/teams/rules
- * if the collections are empty. Called once on first authenticated load.
- */
-export async function initializeWithDefaults(defaultPlayers, defaultTeams, defaultRules) {
-  try {
-    // Check if DB already has data
-    const [players, teams, rules] = await Promise.all([fetchPlayers(), fetchTeams(), fetchRules()]);
-    if (!players || players.length === 0) {
-      await savePlayers(defaultPlayers);
-    }
-    if (!teams || teams.length === 0) {
-      await saveTeams(defaultTeams);
-    }
-    if (!rules || rules.length === 0) {
-      if (defaultRules && defaultRules.length > 0) {
-        await saveRules(defaultRules);
-      }
-    }
-  } catch (err) {
-    console.warn('[API] initializeWithDefaults failed:', err.message);
-  }
+export async function initializeWithDefaults() {
+  // Hardcoded defaults removed. Data is managed exclusively in MongoDB Atlas.
 }
 
 // ── Players ───────────────────────────────────────────────────────────────────

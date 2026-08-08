@@ -21,6 +21,7 @@ const TeamSchema = new mongoose.Schema({
   bgBadge: String,
   totalPurse: { type: Number, default: 10000 },
   spentPurse: { type: Number, default: 0 },
+  maxSquadSize: { type: Number, default: 8 }, // Default 8, configurable / overridable by Super Admin
   playersCount: { type: Number, default: 0 },
   logo: String,
   squad: [SquadPlayerSchema],

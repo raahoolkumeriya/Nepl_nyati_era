@@ -16,6 +16,17 @@ export default function ProjectorView({
     if (!activePlayer) return;
     const curBid = activePlayer.currentBid || activePlayer.basePrice;
     const nextBid = curBid + increment;
+    const remainingPurse = team.totalPurse - team.spentPurse;
+    const maxSquad = team.maxSquadSize || 8;
+
+    if (nextBid > remainingPurse) {
+      alert(`⚠️ Insufficient Purse: ${team.name} only has ₹${remainingPurse} PTS remaining budget!`);
+      return;
+    }
+    if ((team.squad?.length || 0) >= maxSquad) {
+      alert(`⚠️ Squad Limit Reached: ${team.name} has reached its ${maxSquad}-player capacity!`);
+      return;
+    }
 
     soundFx.playBid();
 

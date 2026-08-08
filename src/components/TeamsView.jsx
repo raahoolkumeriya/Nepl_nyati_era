@@ -14,6 +14,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { updateTeam as apiUpdateTeam, deleteTeam as apiDeleteTeam, isMongoDB } from '../services/api';
 
 export default function TeamsView({ teams, setTeams, players, setPlayers }) {
   const { can, usersList } = useAuth();
@@ -31,6 +32,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
     owner: '',
     logo: '🏏',
     totalPurse: 10000,
+    maxSquadSize: 8,
     color: '#d4622a',
   });
 
@@ -45,6 +47,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
       owner: auctioneers[0]?.name || 'Auctioneer Captain',
       logo: '🏏',
       totalPurse: 10000,
+      maxSquadSize: 8,
       color: '#d4622a',
     });
     setShowModal(true);
@@ -58,6 +61,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
       owner: team.owner,
       logo: team.logo || '🏏',
       totalPurse: team.totalPurse || 10000,
+      maxSquadSize: team.maxSquadSize || 8,
       color: team.color || '#d4622a',
     });
     setShowModal(true);
@@ -67,17 +71,28 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
+    const maxSquad = Math.max(1, Number(formData.maxSquadSize) || 8);
+    const purse = Math.max(100, Number(formData.totalPurse) || 10000);
+
     if (editingTeam) {
-      // Update existing team
-      setTeams(prev => prev.map(t => t.id === editingTeam.id ? {
-        ...t,
+      const updatedTeam = {
+        ...editingTeam,
         name: formData.name.trim(),
         shortName: formData.shortName.trim().toUpperCase() || formData.name.substring(0, 3).toUpperCase(),
         owner: formData.owner.trim(),
         logo: formData.logo,
-        totalPurse: Number(formData.totalPurse),
+        totalPurse: purse,
+        maxSquadSize: maxSquad,
         color: formData.color,
-      } : t));
+      };
+
+      // 1. Update React state
+      setTeams(prev => prev.map(t => t.id === editingTeam.id ? updatedTeam : t));
+
+      // 2. Persist directly to MongoDB Atlas
+      if (isMongoDB) {
+        apiUpdateTeam(editingTeam.id, updatedTeam).catch(err => console.warn('MongoDB team edit error:', err));
+      }
     } else {
       // Create new team
       const newTeam = {
@@ -90,12 +105,20 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
         gradient: `from-[${formData.color}]/20 to-warm-900`,
         borderColor: `border-[${formData.color}]/40`,
         bgBadge: `bg-[${formData.color}]/20`,
-        totalPurse: Number(formData.totalPurse),
+        totalPurse: purse,
+        maxSquadSize: maxSquad,
         spentPurse: 0,
         playersCount: 0,
         squad: [],
       };
+      
+      // 1. Update React state
       setTeams(prev => [...prev, newTeam]);
+
+      // 2. Persist directly to MongoDB Atlas
+      if (isMongoDB) {
+        apiUpdateTeam(newTeam.id, newTeam).catch(err => console.warn('MongoDB team create error:', err));
+      }
     }
 
     setShowModal(false);
@@ -120,6 +143,60 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
           }
           return p;
         }));
+      }
+
+      // 3. Delete directly from MongoDB Atlas
+      if (isMongoDB) {
+        apiDeleteTeam(teamToDelete.id).catch(err => console.warn('MongoDB team delete error:', err));
+      }
+    }
+  };
+
+  const handleReleaseTopPlayer = (team) => {
+    if (!team.squad || team.squad.length === 0) {
+      alert(`No players in ${team.name}'s squad to release!`);
+      return;
+    }
+
+    const topPlayer = [...team.squad].reduce((highest, current) => {
+      const highestCost = highest.soldPrice || highest.basePrice || 0;
+      const currentCost = current.soldPrice || current.basePrice || 0;
+      return currentCost > highestCost ? current : highest;
+    }, team.squad[0]);
+
+    const refundAmount = topPlayer.soldPrice || topPlayer.basePrice || 0;
+
+    if (window.confirm(
+      `⚠️ RELEASE TOP BIDDED PLAYER?\n\nDo you want to release ${topPlayer.name} (Sold for ₹${refundAmount} PTS) from ${team.name}?\n\nThis will:\n1. Return ${topPlayer.name} to the Available Auction Pool\n2. Refund ₹${refundAmount} PTS back to ${team.name}'s purse budget`
+    )) {
+      const updatedSquad = (team.squad || []).filter(p => p.id !== topPlayer.id);
+      const updatedTeam = {
+        ...team,
+        spentPurse: Math.max(0, team.spentPurse - refundAmount),
+        playersCount: Math.max(0, (team.playersCount || updatedSquad.length) - 1),
+        squad: updatedSquad,
+      };
+
+      setTeams(prevTeams => prevTeams.map(t => t.id === team.id ? updatedTeam : t));
+
+      if (setPlayers) {
+        setPlayers(prevPlayers => prevPlayers.map(p => {
+          if (p.id === topPlayer.id) {
+            return {
+              ...p,
+              status: 'available',
+              soldPrice: 0,
+              soldTo: null,
+              currentBid: 0,
+              leadingTeam: null,
+            };
+          }
+          return p;
+        }));
+      }
+
+      if (isMongoDB) {
+        apiUpdateTeam(team.id, updatedTeam).catch(err => console.warn('MongoDB release player error:', err));
       }
     }
   };
@@ -231,21 +308,37 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                   <div className="grid grid-cols-3 gap-2 text-center">
                     {[
                       { label: 'Total', value: `₹${team.totalPurse}`, color: 'text-sand-200' },
-                      { label: 'Spent', value: `₹${team.spentPurse}`, color: 'text-cricket-crimson' },
-                      { label: 'Remaining', value: `₹${remainingPurse}`, color: 'text-cricket-emerald' },
+                      { label: 'Spent', value: `₹${team.spentPurse}`, color: 'text-rose-400' },
+                      { label: 'Remaining', value: `₹${remainingPurse}`, color: 'text-emerald-400' },
                     ].map((s, i) => (
                       <div key={i} className={i > 0 ? 'border-l border-warm-800' : ''}>
-                        <span className="text-sand-600 text-[9px] uppercase font-semibold block">{s.label}</span>
+                        <span className="text-slate-500 text-[9px] uppercase font-semibold block">{s.label}</span>
                         <span className={`text-sm font-black ${s.color} font-mono`}>{s.value}</span>
                       </div>
                     ))}
                   </div>
                   <div className="w-full bg-warm-900 h-2 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-cricket-emerald to-[#c9a227] transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-emerald-400 to-amber-400 transition-all duration-500"
                       style={{ width: `${Math.max(0, Math.min(100, (remainingPurse / team.totalPurse) * 100))}%` }}
                     />
                   </div>
+                  
+                  {/* Free / Release Top Bidded Player Button */}
+                  {squad.length > 0 && (can('canBid') || canManage) && (
+                    <div className="pt-2 border-t border-warm-800/60 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Purse Low / Exhausted?
+                      </span>
+                      <button
+                        onClick={() => handleReleaseTopPlayer(team)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[10px] font-bold tracking-wider uppercase transition shadow-sm"
+                        title="Release highest cost player back to auction pool to refund purse"
+                      >
+                        ⚡ Release Top Player (Refund ₹{[...squad].sort((a,b)=>(b.soldPrice||0)-(a.soldPrice||0))[0]?.soldPrice || 0})
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Role breakdown */}
@@ -429,16 +522,43 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
                   </div>
                 </div>
 
+              {/* Bidding Purse & Squad Capacity (Super Admin Overridable) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1.5">Initial Purse (PTS)</label>
+                  <label className="text-xs font-bold text-cyan-300 block mb-1.5 font-display flex items-center justify-between">
+                    <span>Purse Budget (PTS)</span>
+                    <span className="text-[9px] text-purple-300 bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/30">Super Admin Config</span>
+                  </label>
                   <input
                     type="number"
                     required
+                    min={100}
                     value={formData.totalPurse}
                     onChange={e => setFormData({ ...formData, totalPurse: e.target.value })}
                     className="warm-input font-mono"
+                    placeholder="e.g. 10000"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Super Admin decides starting purse budget for auctioneer/team.</p>
                 </div>
+
+                <div>
+                  <label className="text-xs font-bold text-cyan-300 block mb-1.5 font-display flex items-center justify-between">
+                    <span>Max Squad Capacity</span>
+                    <span className="text-[9px] text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">Default: 8</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={30}
+                    value={formData.maxSquadSize}
+                    onChange={e => setFormData({ ...formData, maxSquadSize: e.target.value })}
+                    className="warm-input font-mono"
+                    placeholder="8 (or Super Admin override)"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Default 8 squad members. Super Admin can override to any capacity.</p>
+                </div>
+              </div>
               </div>
 
               {/* Theme Color */}

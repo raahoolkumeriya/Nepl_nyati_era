@@ -13,8 +13,11 @@ import {
   Filter,
   Lock,
   Trash2,
+  Camera,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { compressImage } from '../utils/imageCompressor';
 
 export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
   const { can } = useAuth();
@@ -26,6 +29,8 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const [photoInfo, setPhotoInfo] = useState('');
 
   const [newPlayer, setNewPlayer] = useState({
     name: '',
@@ -40,7 +45,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     economy: 7.0,
     bestBowling: '2/15',
     cricHeroesUrl: 'https://cricheroes.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80'
+    avatarUrl: '/avatars/male.png'
   });
 
   const filteredPlayers = players.filter(p => {
@@ -51,6 +56,31 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
     return matchesSearch && matchesRole && matchesStatus && matchesCat;
   });
+
+  const handlePhotoUpload = async (e, isNew = true, targetPlayerId = null) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setCompressing(true);
+      const compressedDataUrl = await compressImage(file, 400, 400, 0.7);
+      const approxKb = Math.round((compressedDataUrl.length * 3) / 4 / 1024);
+      const sizeTag = `Compressed ~${approxKb} KB`;
+
+      if (isNew) {
+        setPhotoInfo(sizeTag);
+        setNewPlayer(prev => ({ ...prev, avatarUrl: compressedDataUrl }));
+      } else if (targetPlayerId) {
+        setPlayers(prev => prev.map(p => 
+          p.id === targetPlayerId ? { ...p, avatarUrl: compressedDataUrl } : p
+        ));
+      }
+    } catch (err) {
+      alert('Error compressing image: ' + err.message);
+    } finally {
+      setCompressing(false);
+    }
+  };
 
   const handleAddPlayerSubmit = (e) => {
     e.preventDefault();
@@ -68,6 +98,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     };
     setPlayers(prev => [createdPlayer, ...prev]);
     setShowAddModal(false);
+    setPhotoInfo('');
     setNewPlayer({
       name: '',
       role: 'Batting All-Rounder',
@@ -81,7 +112,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
       economy: 7.0,
       bestBowling: '2/15',
       cricHeroesUrl: 'https://cricheroes.com',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80'
+      avatarUrl: '/avatars/male.png'
     });
   };
 
@@ -98,7 +129,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
             return {
               ...t,
               spentPurse: Math.max(0, t.spentPurse - refundedPrice),
-              playersCount: Math.max(0, (t.playersCount || 1) - 1),
+              playersCount: Math.max(0, (t.playersCount || updatedSquad.length) - 1),
               squad: updatedSquad,
             };
           }
@@ -108,44 +139,44 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     }
   };
 
-  const selectClass = "w-full bg-warm-900 border border-warm-700 rounded-xl px-3 py-2.5 text-xs text-sand-300 focus:outline-none focus:border-terracotta-500 transition appearance-none cursor-pointer";
+  const selectClass = "bg-warm-900 border border-warm-700 rounded-xl px-3 py-2 text-xs text-sand-200 focus:outline-none focus:border-terracotta-500 transition cursor-pointer";
 
   return (
     <div className="space-y-6">
       
-      {/* ── Header + Filters ── */}
-      <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header Banner */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-warm-700/50 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <h2 className="text-2xl font-black text-sand-100 flex items-center gap-2 font-serif">
-              <Sparkles className="w-6 h-6 text-[#c9a227]" />
-              Nyati Era Dhanori Player Roster
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-xs font-black uppercase tracking-wider border border-cyan-500/30 mb-3">
+              <Award className="w-3.5 h-3.5" />
+              SQUAD DIRECTORY ({players.length} PLAYERS)
+            </div>
+            <h2 className="text-3xl font-black text-sand-100 tracking-tight font-display">
+              NEPL Players Pool & Roster
             </h2>
-            <p className="text-sand-500 text-xs mt-0.5">
-              {players.length} players · {players.filter(p => p.status === 'sold').length} sold · {players.filter(p => p.status === 'available').length} available
+            <p className="text-sand-400 text-xs mt-2 max-w-xl">
+              Browse stats, roles, categories, and auction status for all registered players in Season 2026.
             </p>
           </div>
 
-          {canAdd ? (
+          {canAdd && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-terracotta-600 hover:bg-terracotta-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-terracotta-600/20 transition"
+              className="btn-primary shrink-0 font-display font-bold uppercase tracking-wider text-xs px-5 py-3"
             >
               <UserPlus className="w-4 h-4" />
-              <span>Add Player</span>
+              <span>Add New Player</span>
             </button>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs text-sand-600 bg-warm-900 px-3 py-2 rounded-xl border border-warm-700">
-              <Lock className="w-3 h-3" />
-              View Only
-            </span>
           )}
         </div>
+      </div>
 
-        {/* Filters */}
+      {/* Filter Bar */}
+      <div className="glass-panel p-4 rounded-2xl border border-warm-700/50 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-sand-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-sand-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search players…"
@@ -188,7 +219,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
           return (
             <div
               key={player.id}
-              className="glass-card p-5 rounded-2xl border border-warm-700/50 glass-card-hover flex flex-col justify-between space-y-4 relative overflow-hidden"
+              className="glass-card p-5 rounded-2xl border border-warm-700/50 glass-card-hover flex flex-col justify-between space-y-4 relative overflow-hidden group"
             >
               {/* Status stripe */}
               <div className={`absolute top-0 left-0 right-0 h-0.5 ${
@@ -200,21 +231,38 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
               <div>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <img
-                      src={player.avatarUrl}
-                      alt={player.name}
-                      className="w-14 h-14 rounded-xl object-cover border-2 border-warm-700 bg-warm-900 flex-shrink-0"
-                      onError={e => { e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'; }}
-                    />
+                    <div className="relative group/avatar shrink-0">
+                      <img
+                        src={player.avatarUrl}
+                        alt={player.name}
+                        className="w-14 h-14 rounded-xl object-cover border-2 border-warm-700 bg-warm-900 shadow-md"
+                        onError={e => { e.target.src = '/avatars/male.png'; }}
+                      />
+                      {/* Photo Update Overlay */}
+                      <label 
+                        className="absolute inset-0 rounded-xl bg-slate-950/75 opacity-0 group-hover/avatar:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-200"
+                        title="Upload compressed photo"
+                      >
+                        <Camera className="w-4 h-4 text-cyan-300" />
+                        <span className="text-[8px] font-bold text-cyan-200 uppercase tracking-tighter">Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handlePhotoUpload(e, false, player.id)}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
                     <div className="min-w-0">
                       <div className="flex items-center space-x-1.5">
-                        <h3 className="font-bold text-sand-100 text-sm truncate">{player.name}</h3>
-                        <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-[#c9a227] hover:text-[#f5c842] flex-shrink-0">
+                        <h3 className="font-bold text-sand-100 text-sm truncate font-display">{player.name}</h3>
+                        <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300 flex-shrink-0">
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
-                      <span className="text-[11px] text-terracotta-300 font-semibold">{player.role}</span>
-                      <span className="block text-[10px] text-[#c9a227] font-mono">{player.category}</span>
+                      <span className="text-[11px] text-cyan-300 font-semibold">{player.role}</span>
+                      <span className="block text-[10px] text-amber-400 font-mono">{player.category}</span>
                     </div>
                   </div>
 
@@ -222,7 +270,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                   {canDelete && (
                     <button
                       onClick={() => handleDeletePlayer(player)}
-                      className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-red-950/80 text-sand-600 hover:text-red-400 border border-warm-700/60 hover:border-red-500/40 transition shrink-0 ml-1"
+                      className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition shrink-0 ml-1"
                       title={`Delete ${player.name}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -231,14 +279,14 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                 </div>
 
                 {/* Stats grid */}
-                <div className="mt-4 grid grid-cols-3 gap-1 bg-warm-950/60 p-2.5 rounded-xl border border-warm-800/50 text-center">
+                <div className="mt-4 grid grid-cols-3 gap-1 bg-warm-950/60 p-2.5 rounded-xl border border-warm-800/50 text-center font-mono">
                   {[
                     { label: 'Matches', value: player.matches, color: 'text-sand-200' },
-                    { label: 'Runs', value: player.runs, color: 'text-cricket-emerald' },
-                    { label: 'Wkts', value: player.wickets, color: 'text-terracotta-400' },
+                    { label: 'Runs', value: player.runs, color: 'text-emerald-400' },
+                    { label: 'Wkts', value: player.wickets, color: 'text-cyan-400' },
                   ].map((s, i) => (
                     <div key={i} className={i > 0 ? 'border-l border-warm-800' : ''}>
-                      <span className="text-[9px] uppercase text-sand-600 block">{s.label}</span>
+                      <span className="text-[9px] uppercase text-slate-500 block">{s.label}</span>
                       <span className={`text-xs font-bold ${s.color}`}>{s.value}</span>
                     </div>
                   ))}
@@ -248,7 +296,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
               {/* Footer */}
               <div className="pt-3 border-t border-warm-800/60 flex items-center justify-between">
                 <div>
-                  <span className="text-[9px] text-sand-600 font-mono block">Base Price</span>
+                  <span className="text-[9px] text-slate-500 font-mono block uppercase">Base Price</span>
                   <span className="text-xs font-bold text-sand-300 font-mono">₹{player.basePrice}</span>
                 </div>
                 <div>
@@ -264,7 +312,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                     </span>
                   ) : (
                     <span className="badge-available">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cricket-emerald animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       Available
                     </span>
                   )}
@@ -288,8 +336,8 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
           <div className="warm-card w-full max-w-xl p-6 sm:p-8 rounded-3xl border border-warm-700/60 space-y-6 relative max-h-[90vh] overflow-y-auto shadow-2xl my-auto">
             
             <div className="flex items-center justify-between border-b border-warm-700/50 pb-4">
-              <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-serif">
-                <UserPlus className="w-5 h-5 text-terracotta-400" />
+              <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-display">
+                <UserPlus className="w-5 h-5 text-cyan-400" />
                 Add Player to Roster
               </h3>
               <button
@@ -362,30 +410,69 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                 </div>
               </div>
 
-              {/* Photo Avatar Preset Picker */}
-              <div>
-                <label className="text-xs font-semibold text-sand-400 block mb-1.5">Generalized Player Photo Avatar</label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {[
-                    { id: 'male', label: 'Male', url: '/avatars/male.png', icon: '👨' },
-                    { id: 'female', label: 'Female', url: '/avatars/female.png', icon: '👩' },
-                    { id: 'master', label: 'Master (7-10)', url: '/avatars/master.png', icon: '👦' },
-                    { id: 'super_master', label: 'Super Master (11-13)', url: '/avatars/super_master.png', icon: '🧢' },
-                  ].map(av => (
-                    <button
-                      key={av.id}
-                      type="button"
-                      onClick={() => setNewPlayer({ ...newPlayer, avatarUrl: av.url })}
-                      className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition ${
-                        newPlayer.avatarUrl === av.url
-                          ? 'bg-terracotta-600/30 border-terracotta-500 ring-2 ring-terracotta-500/40'
-                          : 'bg-warm-900 border-warm-800 hover:border-warm-700'
-                      }`}
-                    >
-                      <img src={av.url} alt={av.label} className="w-10 h-10 rounded-lg object-cover border border-warm-700" />
-                      <span className="text-[10px] font-semibold text-sand-200 text-center leading-tight">{av.icon} {av.label}</span>
-                    </button>
-                  ))}
+              {/* Compressed Photo Upload Section */}
+              <div className="bg-[#0b1120] p-4 rounded-2xl border border-cyan-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-cyan-300 font-display flex items-center gap-1.5">
+                    <Camera className="w-4 h-4" />
+                    Player Compressed Photo Upload
+                  </label>
+                  {photoInfo && (
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      {photoInfo}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <img
+                    src={newPlayer.avatarUrl}
+                    alt="Preview"
+                    className="w-12 h-12 rounded-xl object-cover border-2 border-cyan-500/40 bg-slate-900 shrink-0"
+                  />
+                  <div className="flex-1">
+                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-bold cursor-pointer transition">
+                      <Upload className="w-4 h-4" />
+                      <span>{compressing ? 'Compressing Image…' : 'Choose Photo (Auto-Compress)'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handlePhotoUpload(e, true)}
+                        disabled={compressing}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Photos are automatically compressed to 400x400 max (~15-30KB) for lightweight cloud sync.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Preset Avatars */}
+                <div className="pt-2 border-t border-slate-800">
+                  <span className="text-[10px] text-slate-500 block mb-1.5">Or Select Preset Avatar:</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { id: 'male', label: 'Male', url: '/avatars/male.png' },
+                      { id: 'female', label: 'Female', url: '/avatars/female.png' },
+                      { id: 'master', label: 'Master', url: '/avatars/master.png' },
+                      { id: 'super_master', label: 'Super Master', url: '/avatars/super_master.png' },
+                    ].map(av => (
+                      <button
+                        key={av.id}
+                        type="button"
+                        onClick={() => { setPhotoInfo(''); setNewPlayer({ ...newPlayer, avatarUrl: av.url }); }}
+                        className={`p-1.5 rounded-xl border flex items-center justify-center gap-2 transition ${
+                          newPlayer.avatarUrl === av.url
+                            ? 'bg-cyan-500/20 border-cyan-400 ring-2 ring-cyan-500/30'
+                            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <img src={av.url} alt={av.label} className="w-6 h-6 rounded-md object-cover" />
+                        <span className="text-[10px] text-slate-300 font-medium">{av.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -396,7 +483,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                     <input
                       type="number" value={newPlayer[field]}
                       onChange={e => setNewPlayer({ ...newPlayer, [field]: e.target.value })}
-                      className="warm-input"
+                      className="warm-input font-mono"
                     />
                   </div>
                 ))}
@@ -420,16 +507,18 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" disabled={compressing}>
                   <Plus className="w-4 h-4" />
-                  Add Player
+                  Add Player to Roster
                 </button>
               </div>
             </form>
+
           </div>
         </div>,
         document.body
       )}
+
     </div>
   );
 }

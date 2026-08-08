@@ -8,14 +8,13 @@ import ScheduleStandings from './components/ScheduleStandings';
 import ProjectorView from './components/ProjectorView';
 import LoginPage from './auth/LoginPage';
 import { AuthProvider, useAuth } from './auth/AuthContext';
-import { DEFAULT_TEAMS, DEFAULT_PLAYERS, TOURNAMENT_RULES } from './data/initialData';
+import { TOURNAMENT_RULES } from './data/initialData';
 import { soundFx } from './utils/audio';
 import { 
   fetchPlayers, savePlayers, 
   fetchTeams, saveTeams, 
   fetchHistory, saveHistory,
   fetchRules, saveRules,
-  initializeWithDefaults,
   isMongoDB,
   checkServerHealth,
 } from './services/api';
@@ -36,16 +35,16 @@ function AppInner() {
   const [teams, setTeams] = useState(() => {
     try {
       const saved = localStorage.getItem('nepl_teams');
-      return saved ? JSON.parse(saved) : DEFAULT_TEAMS;
-    } catch { return DEFAULT_TEAMS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   // ── Players state ─────────────────────────────────────────────────────────
   const [players, setPlayers] = useState(() => {
     try {
       const saved = localStorage.getItem('nepl_players');
-      return saved ? JSON.parse(saved) : DEFAULT_PLAYERS;
-    } catch { return DEFAULT_PLAYERS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   // ── Bid history state ─────────────────────────────────────────────────────
@@ -73,13 +72,9 @@ function AppInner() {
     
     async function loadFromMongoDB() {
       try {
-        // Check if Express backend + MongoDB are available
         const serverUp = await checkServerHealth();
         
         if (serverUp) {
-          // Seed defaults if DB is empty, then load
-          await initializeWithDefaults(DEFAULT_PLAYERS, DEFAULT_TEAMS, TOURNAMENT_RULES);
-          
           const [dbPlayers, dbTeams, dbHistory, dbRules] = await Promise.all([
             fetchPlayers(),
             fetchTeams(),
@@ -87,13 +82,13 @@ function AppInner() {
             fetchRules(),
           ]);
 
-          if (dbPlayers?.length) setPlayers(dbPlayers);
-          if (dbTeams?.length) setTeams(dbTeams);
-          if (dbHistory?.length) setHistory(dbHistory);
-          if (dbRules?.length) setRules(dbRules);
+          setPlayers(Array.isArray(dbPlayers) ? dbPlayers : []);
+          setTeams(Array.isArray(dbTeams) ? dbTeams : []);
+          setHistory(Array.isArray(dbHistory) ? dbHistory : []);
+          setRules(Array.isArray(dbRules) && dbRules.length ? dbRules : TOURNAMENT_RULES);
         }
       } catch (err) {
-        console.warn('[App] MongoDB load failed, using localStorage:', err);
+        console.warn('[App] MongoDB load failed:', err);
       } finally {
         setIsLoading(false);
       }
@@ -145,16 +140,23 @@ function AppInner() {
   }, [rules, isLoading]);
 
   // ── Reset data ────────────────────────────────────────────────────────────
-  const handleResetData = useCallback(() => {
-    if (window.confirm("Reset all auction data, bids, teams, and rules to default state?")) {
-      setTeams(DEFAULT_TEAMS);
-      setPlayers(DEFAULT_PLAYERS);
+  const handleResetData = useCallback(async () => {
+    if (window.confirm("Clear all live auction data, bids, and teams from MongoDB Atlas?")) {
+      setTeams([]);
+      setPlayers([]);
       setHistory([]);
       setRules(TOURNAMENT_RULES);
       localStorage.removeItem('nepl_teams');
       localStorage.removeItem('nepl_players');
       localStorage.removeItem('nepl_history');
       localStorage.removeItem('nepl_rules');
+      if (isMongoDB) {
+        try {
+          await Promise.all([savePlayers([]), saveTeams([]), saveHistory([])]);
+        } catch (err) {
+          console.warn('Reset MongoDB error:', err);
+        }
+      }
     }
   }, []);
 

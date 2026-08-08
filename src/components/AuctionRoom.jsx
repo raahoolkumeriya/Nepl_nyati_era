@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { useAuth } from '../auth/AuthContext';
+import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam, isMongoDB } from '../services/api';
 
 export default function AuctionRoom({ 
   players, 
@@ -35,6 +36,13 @@ export default function AuctionRoom({
     const firstAvail = players.find(p => p.status === 'available');
     return firstAvail ? firstAvail.id : (players[0]?.id || null);
   });
+
+  useEffect(() => {
+    if ((!activePlayerId || !players.some(p => p.id === activePlayerId)) && players.length > 0) {
+      const firstAvail = players.find(p => p.status === 'available');
+      setActivePlayerId(firstAvail ? firstAvail.id : players[0]?.id);
+    }
+  }, [players, activePlayerId]);
 
   const activePlayer = players.find(p => p.id === activePlayerId);
   const [currentBid, setCurrentBid] = useState(activePlayer ? activePlayer.basePrice : 500);
@@ -62,7 +70,8 @@ export default function AuctionRoom({
         const validTeams = teams.filter(t => {
           const isCurrentHigh = highBidder?.id === t.id;
           const remainingPurse = t.totalPurse - t.spentPurse;
-          const isFull = t.squad?.length >= 8;
+          const maxCapacity = t.maxSquadSize || 8;
+          const isFull = (t.squad?.length || 0) >= maxCapacity;
           return !isCurrentHigh && !isFull && remainingPurse >= currentBid + 50;
         });
 
@@ -81,15 +90,29 @@ export default function AuctionRoom({
 
   const handlePlaceBid = (team, newBidAmount) => {
     if (!activePlayer || activePlayer.status === 'sold') return;
+
+    if (!newBidAmount || isNaN(newBidAmount) || newBidAmount <= 0) {
+      alert("⚠️ Invalid Bid: Bid amount must be a positive number greater than 0!");
+      return;
+    }
+
     const remainingPurse = team.totalPurse - team.spentPurse;
     if (newBidAmount > remainingPurse) {
-      alert(`${team.name} doesn't have enough purse (₹${remainingPurse} PTS available)!`);
+      alert(`⚠️ Insufficient Purse: ${team.name} only has ₹${remainingPurse} PTS remaining budget. Cannot place bid of ₹${newBidAmount} PTS!`);
       return;
     }
-    if (team.squad?.length >= 8) {
-      alert(`${team.name} has reached the 8-player squad limit!`);
+
+    if (newBidAmount <= currentBid && highBidder) {
+      alert(`⚠️ Bid Must Be Higher: New bid (₹${newBidAmount} PTS) must be higher than current bid (₹${currentBid} PTS)!`);
       return;
     }
+
+    const maxSquad = team.maxSquadSize || 8;
+    if ((team.squad?.length || 0) >= maxSquad) {
+      alert(`⚠️ Squad Limit Reached: ${team.name} has reached its ${maxSquad}-player squad capacity (configured by Super Admin)!`);
+      return;
+    }
+
     soundFx.playBid();
     setCurrentBid(newBidAmount);
     setHighBidder(team);
@@ -115,17 +138,27 @@ export default function AuctionRoom({
     confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
     const soldPrice = currentBid;
     const buyerTeamId = highBidder.id;
+
+    const updatedPlayer = { ...activePlayer, status: 'sold', soldPrice, soldTo: buyerTeamId };
+    const updatedTeam = {
+      ...highBidder,
+      spentPurse: highBidder.spentPurse + soldPrice,
+      playersCount: (highBidder.playersCount || 0) + 1,
+      squad: [...(highBidder.squad || []), { ...activePlayer, soldPrice }]
+    };
+
     setPlayers(prev => prev.map(p => 
-      p.id === activePlayer.id ? { ...p, status: 'sold', soldPrice, soldTo: buyerTeamId } : p
+      p.id === activePlayer.id ? updatedPlayer : p
     ));
     setTeams(prev => prev.map(t => 
-      t.id === buyerTeamId ? {
-        ...t,
-        spentPurse: t.spentPurse + soldPrice,
-        playersCount: (t.playersCount || 0) + 1,
-        squad: [...(t.squad || []), { ...activePlayer, soldPrice }]
-      } : t
+      t.id === buyerTeamId ? updatedTeam : t
     ));
+
+    if (isMongoDB) {
+      apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player sold update err:', err));
+      apiUpdateTeam(buyerTeamId, updatedTeam).catch(err => console.warn('MongoDB team sold update err:', err));
+    }
+
     setHistory(prev => [{
       id: Date.now().toString(),
       type: 'SOLD',
@@ -134,6 +167,7 @@ export default function AuctionRoom({
       amount: soldPrice,
       timestamp: new Date().toLocaleTimeString()
     }, ...prev]);
+
     setTimeout(() => {
       const nextP = players.find(p => p.id !== activePlayer.id && p.status === 'available');
       if (nextP) setActivePlayerId(nextP.id);
@@ -143,7 +177,11 @@ export default function AuctionRoom({
   const handleMarkUnsold = () => {
     if (!activePlayer) return;
     soundFx.playUnsold();
-    setPlayers(prev => prev.map(p => p.id === activePlayer.id ? { ...p, status: 'unsold' } : p));
+    const updatedPlayer = { ...activePlayer, status: 'unsold' };
+    setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updatedPlayer : p));
+    if (isMongoDB) {
+      apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player unsold update err:', err));
+    }
     setHistory(prev => [{
       id: Date.now().toString(),
       type: 'UNSOLD',
