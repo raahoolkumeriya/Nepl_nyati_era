@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Shield,
   UserCheck,
+  FileCode2,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import AuctioneerManagerModal from './AuctioneerManagerModal';
@@ -101,6 +102,19 @@ export default function Header({
 
           {/* ── Right Cyber Controls ── */}
           <div className="flex items-center space-x-2.5">
+            {/* API Docs */}
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:flex items-center space-x-1.5 text-[11px] px-3 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,242,254,0.15)] transition"
+              title="Interactive OpenAPI 3.0 / Swagger UI Docs"
+            >
+              <FileCode2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold font-display uppercase tracking-wider text-[10px]">API Docs</span>
+              <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+            </a>
+
             {/* CricHeroes */}
             <a
               href="https://cricheroes.com"

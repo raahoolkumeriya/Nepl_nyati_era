@@ -10,6 +10,8 @@ import historyRouter from './routes/history.js';
 import rulesRouter from './routes/rules.js';
 import Rule from './models/Rule.js';
 import { DEFAULT_RULES } from './data/defaultRules.js';
+import { serveSwaggerUi, setupSwaggerUi, openApiSpec } from './swagger.js';
+import { verifyApiKey } from './middleware/authApiKey.js';
 
 dotenv.config();
 
@@ -23,15 +25,24 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
+
+// Protect mutating API routes with API key verification
+app.use('/api', verifyApiKey);
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/players', playersRouter);
 app.use('/api/teams', teamsRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/rules', rulesRouter);
+
+// ── Interactive API Documentation (OpenAPI 3.0 / Swagger UI) ────────────────
+app.use('/api/docs', serveSwaggerUi, setupSwaggerUi);
+app.get('/docs', (req, res) => res.redirect('/api/docs'));
+app.get('/api/openapi.json', (req, res) => res.json(openApiSpec));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -50,13 +61,15 @@ app.use(express.static(distPath));
 
 // SPA Fallback for client-side routing (compatible with Express 4/5 & path-to-regexp 8+)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/docs')) return next();
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
 // ── Start Express Server Immediately (Render compatibility) ──────────────────
 app.listen(PORT, () => {
-  console.log(`\n🚀  NEPL Server running on port ${PORT} (API at /api)`);
+  console.log(`\n🚀  NEPL Server running on port ${PORT}`);
+  console.log(`📖  Interactive API Docs available at http://localhost:${PORT}/api/docs`);
+  console.log(`🔑  API Key protection active for mutating routes (x-api-key required)\n`);
 });
 
 // ── MongoDB Connection & Auto-Seeding ─────────────────────────────────────────

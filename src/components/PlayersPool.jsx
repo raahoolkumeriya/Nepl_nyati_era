@@ -85,13 +85,20 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
   const handleAddPlayerSubmit = (e) => {
     e.preventDefault();
     if (!newPlayer.name.trim()) return;
+
+    const basePrice = Number(newPlayer.basePrice);
+    if (!basePrice || isNaN(basePrice) || basePrice <= 0) {
+      alert("⚠️ Invalid Base Price: Base price must be a positive number greater than 0!");
+      return;
+    }
+
     const createdPlayer = {
       ...newPlayer,
       id: `ply-${Date.now()}`,
-      basePrice: Number(newPlayer.basePrice),
-      matches: Number(newPlayer.matches),
-      runs: Number(newPlayer.runs),
-      wickets: Number(newPlayer.wickets),
+      basePrice: Math.max(50, basePrice),
+      matches: Math.max(0, Number(newPlayer.matches) || 0),
+      runs: Math.max(0, Number(newPlayer.runs) || 0),
+      wickets: Math.max(0, Number(newPlayer.wickets) || 0),
       status: 'available',
       soldPrice: 0,
       soldTo: null

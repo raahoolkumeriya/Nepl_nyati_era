@@ -71,8 +71,14 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
+    const purse = Number(formData.totalPurse);
+    if (!purse || isNaN(purse) || purse <= 0) {
+      alert("⚠️ Invalid Purse: Team total purse budget must be a positive number greater than 0!");
+      return;
+    }
+
     const maxSquad = Math.max(1, Number(formData.maxSquadSize) || 8);
-    const purse = Math.max(100, Number(formData.totalPurse) || 10000);
+    const validPurse = Math.max(100, purse);
 
     if (editingTeam) {
       const updatedTeam = {
@@ -81,7 +87,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
         shortName: formData.shortName.trim().toUpperCase() || formData.name.substring(0, 3).toUpperCase(),
         owner: formData.owner.trim(),
         logo: formData.logo,
-        totalPurse: purse,
+        totalPurse: validPurse,
         maxSquadSize: maxSquad,
         color: formData.color,
       };
@@ -102,7 +108,7 @@ export default function TeamsView({ teams, setTeams, players, setPlayers }) {
         gradient: `from-[${formData.color}]/20 to-warm-900`,
         borderColor: `border-[${formData.color}]/40`,
         bgBadge: `bg-[${formData.color}]/20`,
-        totalPurse: purse,
+        totalPurse: validPurse,
         maxSquadSize: maxSquad,
         spentPurse: 0,
         playersCount: 0,

@@ -52,7 +52,7 @@ cp .env.example .env
 
 Open `.env` and set:
 ```
-MONGODB_URI=mongodb+srv://codelocked:teHuNben4veJ3zxA@cluster0.XXXXX.mongodb.net/nepl_cricket
+MONGODB_URI=mongodb+srv://codelocked:*****@cluster0.XXXXX.mongodb.net/nepl_cricket
 ```
 Replace `cluster0.XXXXX.mongodb.net` with your actual cluster hostname from Step 1.
 

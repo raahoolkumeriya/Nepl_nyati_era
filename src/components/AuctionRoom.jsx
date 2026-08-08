@@ -129,22 +129,41 @@ export default function AuctionRoom({
     setHistory(prev => [logItem, ...prev]);
   };
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    setIsProcessing(false);
+  }, [activePlayerId]);
+
   const handleMarkSold = () => {
-    if (!activePlayer || !highBidder) {
+    if (isProcessing) return;
+    if (!activePlayer || activePlayer.status === 'sold' || !highBidder) {
       alert("Place at least one bid before marking Sold!");
       return;
     }
+
+    const buyerTeam = teams.find(t => t.id === highBidder.id);
+    if (!buyerTeam) return;
+
+    if (buyerTeam.squad?.some(p => p.id === activePlayer.id)) {
+      alert(`⚠️ ${activePlayer.name} has already been sold to ${buyerTeam.name}!`);
+      return;
+    }
+
+    setIsProcessing(true);
     soundFx.playSold();
     confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
     const soldPrice = currentBid;
     const buyerTeamId = highBidder.id;
 
     const updatedPlayer = { ...activePlayer, status: 'sold', soldPrice, soldTo: buyerTeamId };
+    const alreadyInSquad = (buyerTeam.squad || []).some(p => p.id === activePlayer.id);
+    const updatedSquad = alreadyInSquad ? buyerTeam.squad : [...(buyerTeam.squad || []), { ...activePlayer, soldPrice }];
     const updatedTeam = {
-      ...highBidder,
-      spentPurse: highBidder.spentPurse + soldPrice,
-      playersCount: (highBidder.playersCount || 0) + 1,
-      squad: [...(highBidder.squad || []), { ...activePlayer, soldPrice }]
+      ...buyerTeam,
+      spentPurse: buyerTeam.spentPurse + (alreadyInSquad ? 0 : soldPrice),
+      playersCount: updatedSquad.length,
+      squad: updatedSquad
     };
 
     setPlayers(prev => prev.map(p => 
@@ -169,6 +188,7 @@ export default function AuctionRoom({
     setTimeout(() => {
       const nextP = players.find(p => p.id !== activePlayer.id && p.status === 'available');
       if (nextP) setActivePlayerId(nextP.id);
+      setIsProcessing(false);
     }, 1200);
   };
 
