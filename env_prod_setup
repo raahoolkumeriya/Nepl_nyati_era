@@ -1,0 +1,20 @@
+# Production Environment Setup for Render.com & Local Dev
+MONGODB_URI=mongodb+srv://codelocked:FJi9HEU2eeA8QXS1@nyatiera.v653v8g.mongodb.net/?appName=nyatiera
+PORT=3001
+FRONTEND_URL=http://localhost:5173
+VITE_API_URL=/api
+API_KEY=TTBPq1o0KhaMicvxAvuyT3Q23qr51XgabEorbqA-kwo
+VITE_API_KEY=TTBPq1o0KhaMicvxAvuyT3Q23qr51XgabEorbqA-kwo
+
+# App Developer & Admin Roles
+VITE_SUPREMEMASTER_EMAIL=developer@nepl.in
+VITE_SUPREMEMASTER_PASS=Supreme@Dev2026
+
+VITE_SUPERUSER_EMAIL=admin@nepl.in
+VITE_SUPERUSER_PASS=Super@dmin2026
+
+VITE_AUCTIONEER_EMAIL=auction@nepl.in
+VITE_AUCTIONEER_PASS=Auction@2026
+
+VITE_PLAYER_EMAIL=player@nepl.in
+VITE_PLAYER_PASS=Player@2026

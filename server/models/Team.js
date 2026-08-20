@@ -8,6 +8,8 @@ const SquadPlayerSchema = new mongoose.Schema({
   soldPrice: Number,
   avatarUrl: String,
   cricHeroesUrl: String,
+  isCaptain: { type: Boolean, default: false },
+  isAuctioneer: { type: Boolean, default: false },
 }, { _id: false });
 
 const TeamSchema = new mongoose.Schema({
@@ -15,6 +17,8 @@ const TeamSchema = new mongoose.Schema({
   name: String,
   shortName: String,
   owner: String,
+  captainId: String,
+  captainName: String,
   color: String,
   gradient: String,
   borderColor: String,

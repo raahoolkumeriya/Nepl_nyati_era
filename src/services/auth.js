@@ -115,8 +115,8 @@ export const ROLES = {
 const DEFAULT_CREDENTIALS = [
   {
     id: 'usr-supreme-master-default',
-    email: import.meta.env.VITE_SUPREMEMASTER_EMAIL || 'developer@nepl.in',
-    password: import.meta.env.VITE_SUPREMEMASTER_PASS || 'Supreme@Dev2026',
+    email: (import.meta.env.VITE_SUPREMEMASTER_EMAIL || '').trim().toLowerCase() || 'developer@nepl.in',
+    password: (import.meta.env.VITE_SUPREMEMASTER_PASS || '').trim(),
     role: 'suprememaster',
     name: 'Supreme Master (App Developer)',
     avatar: '👑',
@@ -124,8 +124,8 @@ const DEFAULT_CREDENTIALS = [
   },
   {
     id: 'usr-admin-default',
-    email: import.meta.env.VITE_SUPERUSER_EMAIL || 'admin@nepl.in',
-    password: import.meta.env.VITE_SUPERUSER_PASS || 'Super@dmin2026',
+    email: (import.meta.env.VITE_SUPERUSER_EMAIL || '').trim().toLowerCase() || 'admin@nepl.in',
+    password: (import.meta.env.VITE_SUPERUSER_PASS || '').trim(),
     role: 'superuser',
     name: 'Super Admin',
     avatar: '⚡',
@@ -133,8 +133,8 @@ const DEFAULT_CREDENTIALS = [
   },
   {
     id: 'usr-auction-default',
-    email: import.meta.env.VITE_AUCTIONEER_EMAIL || 'auction@nepl.in',
-    password: import.meta.env.VITE_AUCTIONEER_PASS || 'Auction@NEPL2024',
+    email: (import.meta.env.VITE_AUCTIONEER_EMAIL || '').trim().toLowerCase() || 'auction@nepl.in',
+    password: (import.meta.env.VITE_AUCTIONEER_PASS || '').trim(),
     role: 'auctioneer',
     name: 'Auction Member',
     avatar: '🔨',
@@ -142,8 +142,8 @@ const DEFAULT_CREDENTIALS = [
   },
   {
     id: 'usr-player-default',
-    email: import.meta.env.VITE_PLAYER_EMAIL || 'player@nepl.in',
-    password: import.meta.env.VITE_PLAYER_PASS || 'Player@NEPL2024',
+    email: (import.meta.env.VITE_PLAYER_EMAIL || '').trim().toLowerCase() || 'player@nepl.in',
+    password: (import.meta.env.VITE_PLAYER_PASS || '').trim(),
     role: 'player',
     name: 'Player',
     avatar: '🏏',
@@ -182,17 +182,45 @@ export function getAllUsers() {
 }
 
 /**
- * Add a new auctioneer or user (Super Admin operation)
+ * Add or update an auctioneer or user (Super Admin operation)
  */
 export function addAuctioneer({ name, email, password, role = 'auctioneer' }) {
   const cleanEmail = email.trim().toLowerCase();
-  const allUsers = getAllUsers();
-  
-  if (allUsers.some(u => u.email.toLowerCase() === cleanEmail)) {
-    throw new Error(`A user with email ${cleanEmail} already exists!`);
+  const avatar = role === 'suprememaster' ? '👑' : role === 'superuser' ? '⚡' : role === 'auctioneer' ? '🔨' : '🏏';
+  const customUsers = getCustomUsers();
+  const existingCustomIdx = customUsers.findIndex(u => u.email.toLowerCase() === cleanEmail);
+
+  if (existingCustomIdx >= 0) {
+    // Update existing custom user
+    const updated = {
+      ...customUsers[existingCustomIdx],
+      name: name.trim(),
+      password: password ? password.trim() : customUsers[existingCustomIdx].password,
+      role,
+      avatar,
+      updatedAt: new Date().toISOString(),
+    };
+    customUsers[existingCustomIdx] = updated;
+    saveCustomUsers(customUsers);
+    return updated;
   }
 
-  const avatar = role === 'superuser' ? '⚡' : role === 'auctioneer' ? '🔨' : '🏏';
+  // Check if it's overriding a default user
+  const defaultIdx = DEFAULT_CREDENTIALS.findIndex(u => u.email.toLowerCase() === cleanEmail);
+  if (defaultIdx >= 0) {
+    const overrideUser = {
+      ...DEFAULT_CREDENTIALS[defaultIdx],
+      name: name ? name.trim() : DEFAULT_CREDENTIALS[defaultIdx].name,
+      password: password ? password.trim() : DEFAULT_CREDENTIALS[defaultIdx].password,
+      role,
+      avatar,
+      isDefault: false,
+      updatedAt: new Date().toISOString(),
+    };
+    const updatedCustomUsers = [overrideUser, ...customUsers];
+    saveCustomUsers(updatedCustomUsers);
+    return overrideUser;
+  }
 
   const newUser = {
     id: `usr-${Date.now()}`,
@@ -205,10 +233,84 @@ export function addAuctioneer({ name, email, password, role = 'auctioneer' }) {
     createdAt: new Date().toISOString(),
   };
 
-  const customUsers = getCustomUsers();
   const updatedCustomUsers = [newUser, ...customUsers];
   saveCustomUsers(updatedCustomUsers);
   return newUser;
+}
+
+/**
+ * Update user role directly (e.g. promote Player to Auctioneer)
+ */
+export function updateUserRole(email, newRole, newPassword = null) {
+  const cleanEmail = email.trim().toLowerCase();
+  const allUsers = getAllUsers();
+  const existing = allUsers.find(u => u.email.toLowerCase() === cleanEmail);
+
+  if (!existing) {
+    throw new Error(`User with email ${cleanEmail} not found!`);
+  }
+
+  const defaultPass = (import.meta.env.VITE_AUCTIONEER_PASS || '').trim();
+
+  return addAuctioneer({
+    name: existing.name,
+    email: cleanEmail,
+    password: newPassword ? newPassword.trim() : (existing.password || defaultPass),
+    role: newRole,
+  });
+}
+
+/**
+ * Toggle active/disabled status for an auctioneer or user
+ */
+export function toggleUserDisabled(email) {
+  const cleanEmail = email.trim().toLowerCase();
+  const superAdminEmail = (import.meta.env.VITE_SUPERUSER_EMAIL || '').trim().toLowerCase() || 'admin@nepl.in';
+  
+  if (cleanEmail === superAdminEmail) {
+    throw new Error("The primary Super Admin account cannot be disabled!");
+  }
+
+  const allUsers = getAllUsers();
+  const existing = allUsers.find(u => u.email.toLowerCase() === cleanEmail);
+  if (!existing) {
+    throw new Error(`User with email ${cleanEmail} not found!`);
+  }
+
+  const newDisabledState = !existing.isDisabled;
+  const customUsers = getCustomUsers();
+  const existingCustomIdx = customUsers.findIndex(u => u.email.toLowerCase() === cleanEmail);
+
+  if (existingCustomIdx >= 0) {
+    customUsers[existingCustomIdx].isDisabled = newDisabledState;
+    customUsers[existingCustomIdx].updatedAt = new Date().toISOString();
+    saveCustomUsers(customUsers);
+    return customUsers[existingCustomIdx];
+  }
+
+  // Override default user
+  const defaultIdx = DEFAULT_CREDENTIALS.findIndex(u => u.email.toLowerCase() === cleanEmail);
+  if (defaultIdx >= 0) {
+    const override = {
+      ...DEFAULT_CREDENTIALS[defaultIdx],
+      isDisabled: newDisabledState,
+      isDefault: false,
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [override, ...customUsers];
+    saveCustomUsers(updated);
+    return override;
+  }
+
+  return existing;
+}
+
+/**
+ * Revoke auctioneer access (downgrades to player)
+ */
+export function revokeAuctioneerAccess(email) {
+  const cleanEmail = email.trim().toLowerCase();
+  return updateUserRole(cleanEmail, 'player');
 }
 
 /**
@@ -216,9 +318,10 @@ export function addAuctioneer({ name, email, password, role = 'auctioneer' }) {
  */
 export function deleteAuctioneer(emailToDelete) {
   const cleanEmail = emailToDelete.trim().toLowerCase();
+  const superAdminEmail = (import.meta.env.VITE_SUPERUSER_EMAIL || '').trim().toLowerCase() || 'admin@nepl.in';
   
   // Protect default superadmin
-  if (cleanEmail === (import.meta.env.VITE_SUPERUSER_EMAIL || 'admin@nepl.in').toLowerCase()) {
+  if (cleanEmail === superAdminEmail) {
     throw new Error("The primary Super Admin account cannot be deleted!");
   }
 
@@ -230,19 +333,55 @@ export function deleteAuctioneer(emailToDelete) {
 
 /**
  * Validate credentials and return user object if valid
+ * Secure: checks backend auth API where credentials are validated against server environment variables
  */
-export function validateCredentials(email, password) {
+export async function validateCredentials(email, password) {
+  if (!email || !password) return null;
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanPass = password.trim();
+  if (!cleanPass) return null;
+
+  // 1. Try server-side authentication (passwords evaluated against server environment)
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password: cleanPass }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.user) {
+        return data.user;
+      }
+    } else if (res.status === 401 || res.status === 403) {
+      const err = await res.json().catch(() => ({}));
+      if (err.error) throw new Error(err.error);
+      return null;
+    }
+  } catch (err) {
+    if (err.message && (err.message.includes('⛔') || err.message.includes('Invalid') || err.message.includes('disabled'))) {
+      throw err;
+    }
+    // If backend is unreachable, proceed to client fallback
+  }
+
+  // 2. Client-side validation fallback for custom users / dev environment
   const allUsers = getAllUsers();
   const cred = allUsers.find(
-    c => c.email.toLowerCase() === email.trim().toLowerCase() && c.password === password
+    c => c.email.toLowerCase() === cleanEmail && c.password && c.password === cleanPass
   );
   if (!cred) return null;
+  if (cred.isDisabled) {
+    throw new Error(`⛔ Account (${cred.email}) has been disabled by Super Admin. Access is revoked.`);
+  }
   return {
     id: cred.id,
     email: cred.email,
     name: cred.name,
     role: cred.role,
     avatar: cred.avatar,
+    isDisabled: Boolean(cred.isDisabled),
     loginAt: Date.now(),
   };
 }
@@ -251,7 +390,7 @@ export function validateCredentials(email, password) {
  * Check if user has a specific permission
  */
 export function hasPermission(user, permission) {
-  if (!user) return false;
+  if (!user || user.isDisabled) return false;
   const roleConfig = ROLES[user.role];
   if (!roleConfig) return false;
   return roleConfig.permissions[permission] === true;

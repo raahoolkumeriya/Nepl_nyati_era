@@ -88,11 +88,11 @@ Go to **Atlas → Network Access** and add your IP address (or `0.0.0.0/0` for d
 
 ## Auth Credentials
 
-| Role | Email | Password |
+| Role | Email | 
 |---|---|---|
-| ⚡ Super Admin | `admin@nepl.in` | `Nyati@Super2024` |
-| 🔨 Auctioneer | `auction@nepl.in` | `Auction@NEPL2024` |
-| 🏏 Player | `player@nepl.in` | `Player@NEPL2024` |
+| ⚡ Super Admin | `admin@nepl.in` |
+| 🔨 Auctioneer | `auction@nepl.in` |
+| 🏏 Player | `player@nepl.in` | 
 
 ---
 

@@ -8,6 +8,9 @@ import {
   getRoleConfig,
   getAllUsers,
   addAuctioneer,
+  updateUserRole,
+  toggleUserDisabled,
+  revokeAuctioneerAccess,
   deleteAuctioneer,
 } from '../services/auth';
 
@@ -18,7 +21,7 @@ export function AuthProvider({ children }) {
   const [usersList, setUsersList] = useState(() => getAllUsers());
 
   const login = useCallback(async (email, password) => {
-    const validUser = validateCredentials(email, password);
+    const validUser = await validateCredentials(email, password);
     if (!validUser) {
       throw new Error('Invalid email or password');
     }
@@ -46,6 +49,31 @@ export function AuthProvider({ children }) {
     return newUser;
   }, []);
 
+  const handleUpdateUserRole = useCallback((email, newRole, newPassword) => {
+    const updated = updateUserRole(email, newRole, newPassword);
+    setUsersList(getAllUsers());
+    return updated;
+  }, []);
+
+  const handleToggleDisabled = useCallback((email) => {
+    const updated = toggleUserDisabled(email);
+    setUsersList(getAllUsers());
+    // If the currently logged-in user is disabled, update active user state
+    if (user && user.email.toLowerCase() === email.toLowerCase()) {
+      setUser(prev => ({ ...prev, isDisabled: updated.isDisabled }));
+    }
+    return updated;
+  }, [user]);
+
+  const handleRevokeAuctioneer = useCallback((email) => {
+    const updated = revokeAuctioneerAccess(email);
+    setUsersList(getAllUsers());
+    if (user && user.email.toLowerCase() === email.toLowerCase()) {
+      setUser(prev => ({ ...prev, role: 'player' }));
+    }
+    return updated;
+  }, [user]);
+
   const handleDeleteAuctioneer = useCallback((emailToDelete) => {
     deleteAuctioneer(emailToDelete);
     setUsersList(getAllUsers());
@@ -64,6 +92,9 @@ export function AuthProvider({ children }) {
       usersList,
       refreshUsers,
       addAuctioneer: handleAddAuctioneer,
+      updateUserRole: handleUpdateUserRole,
+      toggleUserDisabled: handleToggleDisabled,
+      revokeAuctioneerAccess: handleRevokeAuctioneer,
       deleteAuctioneer: handleDeleteAuctioneer,
     }}>
       {children}

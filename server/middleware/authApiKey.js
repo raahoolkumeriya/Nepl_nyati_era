@@ -1,6 +1,12 @@
 export function verifyApiKey(req, res, next) {
-  // Allow all GET requests, health checks, docs, openapi spec
-  if (req.method === 'GET' || req.path.startsWith('/docs') || req.path === '/openapi.json' || req.path === '/health') {
+  // Allow all GET requests, health checks, docs, openapi spec, and user login authentication
+  if (
+    req.method === 'GET' || 
+    req.path.startsWith('/docs') || 
+    req.path === '/openapi.json' || 
+    req.path === '/health' ||
+    req.path.startsWith('/auth')
+  ) {
     return next();
   }
 

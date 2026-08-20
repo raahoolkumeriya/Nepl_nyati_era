@@ -27,7 +27,9 @@ export default function Header({
   setIsProjectorMode, 
   soundEnabled, 
   setSoundEnabled, 
-  onResetData 
+  onResetData,
+  players = [],
+  setPlayers,
 }) {
   const { user, logout, can, roleConfig } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -258,6 +260,8 @@ export default function Header({
       <AuctioneerManagerModal
         isOpen={isManagerOpen}
         onClose={() => setIsManagerOpen(false)}
+        players={players}
+        setPlayers={setPlayers}
       />
 
       {/* Click outside to close user menu */}

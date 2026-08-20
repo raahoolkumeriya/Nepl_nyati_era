@@ -138,6 +138,48 @@ export default function LoginPage() {
               ) : 'Access Auction Platform →'}
             </button>
           </form>
+
+          {/* Quick Account Selection */}
+          <div className="mt-6 pt-5 border-t border-cyan-500/15">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5 font-display flex items-center justify-between">
+              <span>Select Account</span>
+              <span className="text-[10px] text-cyan-400/80 font-normal">Click to fill email</span>
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setEmail('admin@nepl.in'); setError(''); }}
+                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/40 transition group cursor-pointer"
+              >
+                <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300">⚡ Super Admin</div>
+                <div className="text-[10px] text-slate-500 font-mono truncate">admin@nepl.in</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('auction@nepl.in'); setError(''); }}
+                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-amber-500/40 transition group cursor-pointer"
+              >
+                <div className="text-xs font-bold text-slate-200 group-hover:text-amber-300">🔨 Auctioneer</div>
+                <div className="text-[10px] text-slate-500 font-mono truncate">auction@nepl.in</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('player@nepl.in'); setError(''); }}
+                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-emerald-500/40 transition group cursor-pointer"
+              >
+                <div className="text-xs font-bold text-slate-200 group-hover:text-emerald-300">🏏 Player</div>
+                <div className="text-[10px] text-slate-500 font-mono truncate">player@nepl.in</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('developer@nepl.in'); setError(''); }}
+                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-purple-500/40 transition group cursor-pointer"
+              >
+                <div className="text-xs font-bold text-slate-200 group-hover:text-purple-300">👑 Dev Master</div>
+                <div className="text-[10px] text-slate-500 font-mono truncate">developer@nepl.in</div>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Footer note & Copyright */}

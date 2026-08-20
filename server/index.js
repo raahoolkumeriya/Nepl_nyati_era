@@ -8,6 +8,7 @@ import playersRouter from './routes/players.js';
 import teamsRouter from './routes/teams.js';
 import historyRouter from './routes/history.js';
 import rulesRouter from './routes/rules.js';
+import authRouter from './routes/auth.js';
 import Rule from './models/Rule.js';
 import { DEFAULT_RULES } from './data/defaultRules.js';
 import { serveSwaggerUi, setupSwaggerUi, openApiSpec } from './swagger.js';
@@ -34,6 +35,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api', verifyApiKey);
 
 // ── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRouter);
 app.use('/api/players', playersRouter);
 app.use('/api/teams', teamsRouter);
 app.use('/api/history', historyRouter);

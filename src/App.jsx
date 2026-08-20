@@ -248,6 +248,8 @@ function AppInner() {
             soundEnabled={soundEnabled}
             setSoundEnabled={setSoundEnabled}
             onResetData={handleResetData}
+            players={players}
+            setPlayers={setPlayers}
           />
 
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 animate-fade-in-up">

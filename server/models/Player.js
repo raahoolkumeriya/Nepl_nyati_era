@@ -18,6 +18,9 @@ const PlayerSchema = new mongoose.Schema({
   status: { type: String, enum: ['available', 'sold', 'unsold'], default: 'available' },
   soldPrice: { type: Number, default: 0 },
   soldTo: { type: String, default: null },
+  isCaptain: { type: Boolean, default: false },
+  isAuctioneer: { type: Boolean, default: false },
+  captainOfTeamId: { type: String, default: null },
 }, { timestamps: true });
 
 export default mongoose.model('Player', PlayerSchema);

@@ -17,6 +17,8 @@ import {
   Lock,
   TrendingUp,
   X,
+  Crown,
+  Zap,
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { useAuth } from '../auth/AuthContext';
@@ -394,8 +396,14 @@ export default function AuctionRoom({
                         {activePlayer.role}
                       </span>
                       <span className="text-sand-600 text-xs font-mono">#{activePlayer.id}</span>
+                      {(activePlayer.isCaptain || activePlayer.captainOfTeamId || (activePlayer.status === 'sold' && activePlayer.soldPrice === 0 && activePlayer.soldTo)) && (
+                        <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40 flex items-center gap-1">
+                          <Crown className="w-3 h-3 text-amber-400" />
+                          Captain & Auctioneer
+                        </span>
+                      )}
                     </div>
-                    <h2 className="text-3xl sm:text-4xl font-black text-sand-100 mt-1 tracking-tight font-serif">
+                    <h2 className="text-3xl sm:text-4xl font-black text-sand-100 mt-1 tracking-tight font-serif flex items-center gap-2">
                       {activePlayer.name}
                     </h2>
                     <p className="text-sand-600 text-xs flex items-center gap-1.5 mt-0.5">
@@ -403,6 +411,24 @@ export default function AuctionRoom({
                       Nyati Era Dhanori Roster
                     </p>
                   </div>
+
+                  {/* 👑 Captain Retained Notice */}
+                  {(activePlayer.isCaptain || activePlayer.captainOfTeamId || (activePlayer.status === 'sold' && activePlayer.soldPrice === 0 && activePlayer.soldTo)) && (
+                    <div className="p-3 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-amber-300 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Crown className="w-5 h-5 text-amber-400" />
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-wider block">Team Captain & Auctioneer</span>
+                          <span className="text-[10px] text-amber-300/80">
+                            Retained by {teams.find(t => t.id === activePlayer.soldTo || t.id === activePlayer.captainOfTeamId)?.name || 'Assigned Team'} for 0 Credit (₹0 PTS)
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs font-mono">
+                        0 PTS (Retained)
+                      </span>
+                    </div>
+                  )}
 
                   {/* Price Banner */}
                   <div className="grid grid-cols-2 gap-3 bg-warm-900/80 p-4 rounded-2xl border border-warm-700/50">

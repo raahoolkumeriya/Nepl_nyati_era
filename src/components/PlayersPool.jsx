@@ -16,18 +16,23 @@ import {
   Trash2,
   Camera,
   Upload,
+  Crown,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { compressImage } from '../utils/imageCompressor';
 import { updatePlayer as apiUpdatePlayer } from '../services/api';
 
-export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
-  const { user, can } = useAuth();
-  const isSuperAdmin = user?.role === 'superuser';
-  const canAdd = isSuperAdmin || can('canAddPlayers');
-  const canEdit = isSuperAdmin || can('canEditPlayers');
-  const canDelete = isSuperAdmin || can('canDeletePlayers');
-
+export default function PlayersPool({ 
+  players = [], 
+  setPlayers, 
+  teams = [], 
+  setTeams,
+  canAdd = true, 
+  canEdit = true, 
+  canDelete = true 
+}) {
+  const { can, addAuctioneer, revokeAuctioneerAccess } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -35,6 +40,7 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [photoInfo, setPhotoInfo] = useState('');
+  const [promotedInfo, setPromotedInfo] = useState(null);
 
   const [newPlayer, setNewPlayer] = useState({
     name: '',
@@ -60,17 +66,72 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     category: 'Category B',
     basePrice: 100,
     cricHeroesUrl: 'https://cricheroes.com',
+    captainOfTeamId: '',
+    grantAuctioneerAccess: false,
+    auctioneerEmail: '',
+    auctioneerPassword: (import.meta.env.VITE_AUCTIONEER_PASS || '').trim(),
   });
+
+  const defaultAuctioneerPass = (import.meta.env.VITE_AUCTIONEER_PASS || '').trim();
 
   const openEditPlayerModal = (player) => {
     setEditingPlayer(player);
+    const assignedTeamId = player.captainOfTeamId || (player.isCaptain ? player.soldTo : '');
+    const cleanName = player.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.');
     setEditFormData({
       name: player.name,
       role: player.role,
       category: player.category || 'Category B',
       basePrice: player.basePrice || 100,
       cricHeroesUrl: player.cricHeroesUrl || 'https://cricheroes.com',
+      captainOfTeamId: assignedTeamId || '',
+      grantAuctioneerAccess: Boolean(player.isAuctioneer),
+      auctioneerEmail: `${cleanName}@nepl.in`,
+      auctioneerPassword: defaultAuctioneerPass,
     });
+  };
+
+  const handleQuickGrantAuctioneer = (player) => {
+    const cleanName = player.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.');
+    const email = `${cleanName}@nepl.in`;
+    const password = defaultAuctioneerPass;
+
+    if (player.isAuctioneer) {
+      if (window.confirm(`⚠️ Disable & Revoke Auctioneer Access for "${player.name}"?\n\nThis will downgrade their account to Player (view-only) and remove bidding console privileges.`)) {
+        try {
+          if (revokeAuctioneerAccess) revokeAuctioneerAccess(email);
+          const updated = { ...player, isAuctioneer: false };
+          setPlayers(prev => prev.map(p => p.id === player.id ? updated : p));
+          apiUpdatePlayer(player.id, updated).catch(console.warn);
+          alert(`🚫 Auctioneer access disabled for ${player.name}. Role reset to Player.`);
+        } catch (err) {
+          alert(`⚠️ ${err.message || 'Failed to revoke auctioneer access'}`);
+        }
+      }
+      return;
+    }
+
+    try {
+      addAuctioneer({
+        name: player.name,
+        email,
+        password,
+        role: 'auctioneer',
+      });
+
+      const updated = { ...player, isAuctioneer: true };
+      setPlayers(prev => prev.map(p => p.id === player.id ? updated : p));
+      apiUpdatePlayer(player.id, updated).catch(console.warn);
+
+      setPromotedInfo({
+        name: player.name,
+        email,
+        password,
+        role: '🔨 Auctioneer',
+      });
+    } catch (err) {
+      alert(`⚠️ ${err.message || 'Failed to grant auctioneer access'}`);
+    }
   };
 
   const handleEditPlayerSubmit = (e) => {
@@ -83,6 +144,12 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
       return;
     }
 
+    const selectedTeamId = editFormData.captainOfTeamId;
+    const isNowCaptain = Boolean(selectedTeamId);
+    const prevTeamId = editingPlayer.captainOfTeamId || (editingPlayer.isCaptain ? editingPlayer.soldTo : null);
+
+    const isNowAuctioneer = editFormData.grantAuctioneerAccess || isNowCaptain;
+
     const updatedPlayer = {
       ...editingPlayer,
       name: editFormData.name.trim(),
@@ -90,10 +157,98 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
       category: editFormData.category,
       basePrice: Math.max(50, basePrice),
       cricHeroesUrl: editFormData.cricHeroesUrl.trim(),
+      isCaptain: isNowCaptain,
+      isAuctioneer: isNowAuctioneer,
+      captainOfTeamId: selectedTeamId || null,
+      status: isNowCaptain ? 'sold' : (editingPlayer.status === 'sold' && prevTeamId ? 'available' : editingPlayer.status),
+      soldPrice: isNowCaptain ? 0 : (editingPlayer.soldPrice === 0 && prevTeamId ? 0 : editingPlayer.soldPrice),
+      soldTo: isNowCaptain ? selectedTeamId : (editingPlayer.soldTo === prevTeamId ? null : editingPlayer.soldTo),
     };
 
+    const cleanName = editFormData.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.');
+    const email = editFormData.auctioneerEmail.trim() || `${cleanName}@nepl.in`;
+
+    // If grant auctioneer login was checked, add or update login credentials
+    if (editFormData.grantAuctioneerAccess) {
+      try {
+        const password = editFormData.auctioneerPassword.trim() || defaultAuctioneerPass;
+        addAuctioneer({
+          name: editFormData.name.trim(),
+          email,
+          password,
+          role: 'auctioneer',
+        });
+        setPromotedInfo({
+          name: editFormData.name.trim(),
+          email,
+          password,
+          role: '🔨 Auctioneer',
+        });
+      } catch (err) {
+        console.warn('Auctioneer access grant error:', err);
+      }
+    } else if (editingPlayer.isAuctioneer && !editFormData.grantAuctioneerAccess) {
+      // Super Admin explicitly unchecked auctioneer access -> Revoke login role
+      try {
+        if (revokeAuctioneerAccess) revokeAuctioneerAccess(email);
+      } catch (err) {
+        console.warn('Auctioneer access revoke error:', err);
+      }
+    }
+
+    // Update player in state & DB
     setPlayers(prev => prev.map(p => p.id === editingPlayer.id ? updatedPlayer : p));
     apiUpdatePlayer(editingPlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player edit error:', err));
+
+    // Synchronize team squad with 0 credit
+    if (setTeams && (isNowCaptain || prevTeamId)) {
+      setTeams(prevTeams => prevTeams.map(t => {
+        // 1. Remove from previous team if changed
+        if (prevTeamId && t.id === prevTeamId && prevTeamId !== selectedTeamId) {
+          const newSquad = (t.squad || []).filter(p => p.id !== editingPlayer.id);
+          const updated = {
+            ...t,
+            squad: newSquad,
+            playersCount: newSquad.length,
+            captainId: t.captainId === editingPlayer.id ? null : t.captainId,
+            captainName: t.captainId === editingPlayer.id ? null : t.captainName,
+          };
+          apiUpdatePlayer(t.id, updated).catch(console.warn);
+          return updated;
+        }
+
+        // 2. Add to new team as Captain with 0 credit
+        if (selectedTeamId && t.id === selectedTeamId) {
+          const filteredSquad = (t.squad || []).filter(p => p.id !== editingPlayer.id);
+          const squadEntry = {
+            id: editingPlayer.id,
+            name: updatedPlayer.name,
+            role: updatedPlayer.role,
+            category: updatedPlayer.category || 'Male',
+            soldPrice: 0, // 0 credit deduction!
+            avatarUrl: editingPlayer.avatarUrl,
+            cricHeroesUrl: updatedPlayer.cricHeroesUrl,
+            isCaptain: true,
+            isAuctioneer: true,
+          };
+          const newSquad = [squadEntry, ...filteredSquad];
+          const updated = {
+            ...t,
+            owner: updatedPlayer.name,
+            captainId: editingPlayer.id,
+            captainName: updatedPlayer.name,
+            squad: newSquad,
+            playersCount: newSquad.length,
+            spentPurse: newSquad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0),
+          };
+          apiUpdatePlayer(t.id, updated).catch(console.warn);
+          return updated;
+        }
+
+        return t;
+      }));
+    }
+
     setEditingPlayer(null);
   };
 
@@ -101,8 +256,15 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           p.role.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'All' || p.role.includes(roleFilter);
-    const matchesStatus = statusFilter === 'All' || p.status === statusFilter;
     const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
+
+    let matchesStatus = true;
+    if (statusFilter === 'captains') {
+      matchesStatus = Boolean(p.isCaptain || p.captainOfTeamId || (p.status === 'sold' && p.soldPrice === 0 && p.soldTo));
+    } else if (statusFilter !== 'All') {
+      matchesStatus = p.status === statusFilter;
+    }
+
     return matchesSearch && matchesRole && matchesStatus && matchesCat;
   });
 
@@ -261,39 +423,102 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
           </select>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={selectClass}>
             <option value="All">All Status</option>
-            <option value="available">Available</option>
+            <option value="captains">👑 Captains & Auctioneers</option>
+            <option value="available">Available for Auction</option>
             <option value="sold">Sold</option>
             <option value="unsold">Unsold</option>
           </select>
         </div>
       </div>
 
+      {/* Promoted Auctioneer Success Callout */}
+      {promotedInfo && (
+        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl animate-fade-in">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl p-2 bg-amber-500/20 rounded-xl border border-amber-500/40">🔨</span>
+            <div>
+              <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                <span>Auctioneer Console Access Granted for {promotedInfo.name}!</span>
+                <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] uppercase">Active</span>
+              </h4>
+              <p className="text-xs text-sand-300 font-mono mt-0.5">
+                Login: <strong className="text-white">{promotedInfo.email}</strong> • Password: <strong className="text-amber-300">{promotedInfo.password}</strong>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`Email: ${promotedInfo.email}\nPassword: ${promotedInfo.password}\nRole: ${promotedInfo.role}\nURL: ${window.location.origin}`);
+                alert(`📋 Copied login credentials for ${promotedInfo.name} to clipboard!`);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition cursor-pointer"
+            >
+              Copy Credentials
+            </button>
+            <button
+              onClick={() => setPromotedInfo(null)}
+              className="p-1.5 rounded-xl text-sand-400 hover:text-sand-200 bg-warm-900 border border-warm-700 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Player Cards Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {filteredPlayers.map(player => {
-          const buyerTeam = teams.find(t => t.id === player.soldTo);
+          const isCap = Boolean(player.isCaptain || player.captainOfTeamId || (player.soldPrice === 0 && player.status === 'sold' && player.soldTo));
+          const isAuctioneer = Boolean(player.isAuctioneer);
+          const buyerTeam = teams.find(t => t.id === player.soldTo || t.id === player.captainOfTeamId);
           return (
             <div
               key={player.id}
-              className="glass-card p-5 rounded-2xl border border-warm-700/50 glass-card-hover flex flex-col justify-between space-y-4 relative overflow-hidden group"
+              className={`glass-card p-5 rounded-2xl border glass-card-hover flex flex-col justify-between space-y-4 relative overflow-hidden group ${
+                isCap ? 'border-amber-500/50 bg-amber-950/10' : isAuctioneer ? 'border-cyan-500/30' : 'border-warm-700/50'
+              }`}
             >
               {/* Status stripe */}
               <div className={`absolute top-0 left-0 right-0 h-0.5 ${
+                isCap ? 'bg-amber-400' :
                 player.status === 'sold' ? 'bg-terracotta-600' : 
                 player.status === 'unsold' ? 'bg-warm-600' : 'bg-cricket-emerald'
               }`} />
 
               {/* Avatar + Name */}
               <div>
+                {/* 👑 Captain & Auctioneer Header Tag if applicable */}
+                {(isCap || isAuctioneer) && (
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider">
+                      {isCap ? <Crown className="w-3 h-3 text-amber-400" /> : <Zap className="w-2.5 h-2.5 text-cyan-300" />}
+                      {isCap ? 'Captain & Auctioneer' : 'Authorized Auctioneer'}
+                    </span>
+                    {buyerTeam && (
+                      <span className="text-[10px] font-bold text-amber-400 font-mono">
+                        {buyerTeam.shortName}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="relative group/avatar shrink-0">
                       <img
                         src={player.avatarUrl}
                         alt={player.name}
-                        className="w-14 h-14 rounded-xl object-cover border-2 border-warm-700 bg-warm-900 shadow-md"
+                        className={`w-14 h-14 rounded-xl object-cover border-2 bg-warm-900 shadow-md ${
+                          isCap ? 'border-amber-400 ring-2 ring-amber-400/30' : isAuctioneer ? 'border-cyan-400' : 'border-warm-700'
+                        }`}
                         onError={e => { e.target.src = '/avatars/male.png'; }}
                       />
+                      {isCap && (
+                        <span className="absolute -top-1 -right-1 p-1 bg-amber-400 text-slate-950 rounded-full shadow-md z-10">
+                          <Crown className="w-3 h-3" />
+                        </span>
+                      )}
                       {/* Photo Update Overlay */}
                       <label 
                         className="absolute inset-0 rounded-xl bg-slate-950/75 opacity-0 group-hover/avatar:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-200"
@@ -312,23 +537,40 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
 
                     <div className="min-w-0">
                       <div className="flex items-center space-x-1.5">
-                        <h3 className="font-bold text-sand-100 text-sm truncate font-display">{player.name}</h3>
-                        <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300 flex-shrink-0">
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <h3 className="font-bold text-sand-100 text-sm truncate font-display flex items-center gap-1">
+                          {player.name}
+                        </h3>
+                        {player.cricHeroesUrl && (
+                          <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300 flex-shrink-0">
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
                       </div>
                       <span className="text-[11px] text-cyan-300 font-semibold">{player.role}</span>
                       <span className="block text-[10px] text-amber-400 font-mono">{player.category}</span>
                     </div>
                   </div>
 
-                  {/* Super Admin Edit & Delete Player Buttons */}
+                  {/* Super Admin Edit, Promote & Delete Player Buttons */}
                   <div className="flex items-center space-x-1 shrink-0 ml-1">
+                    {can('canManageUsers') && (
+                      <button
+                        onClick={() => handleQuickGrantAuctioneer(player)}
+                        className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                          player.isAuctioneer
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                            : 'bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border-warm-700/60 hover:border-amber-500/40'
+                        }`}
+                        title={player.isAuctioneer ? `⚡ Auctioneer access active for ${player.name}` : `⚡ Grant Auctioneer Console Login to ${player.name}`}
+                      >
+                        <Zap className={`w-3.5 h-3.5 ${player.isAuctioneer ? 'text-amber-400 fill-amber-400' : ''}`} />
+                      </button>
+                    )}
                     {canEdit && (
                       <button
                         onClick={() => openEditPlayerModal(player)}
                         className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border border-warm-700/60 hover:border-amber-500/40 transition cursor-pointer"
-                        title={`Edit ${player.name}`}
+                        title={`Edit ${player.name} & Roles`}
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
@@ -367,7 +609,14 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                   <span className="text-xs font-bold text-sand-300 font-mono">₹{player.basePrice}</span>
                 </div>
                 <div>
-                  {player.status === 'sold' && buyerTeam ? (
+                  {isCap && buyerTeam ? (
+                    <span 
+                      className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border flex items-center space-x-1.5 font-mono bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm"
+                    >
+                      <Crown className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{buyerTeam.logo} {buyerTeam.shortName} · 0 PTS (Captain)</span>
+                    </span>
+                  ) : player.status === 'sold' && buyerTeam ? (
                     <span 
                       className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border flex items-center space-x-1.5 font-mono shadow-md"
                       style={{ 
@@ -676,6 +925,74 @@ export default function PlayersPool({ players, setPlayers, teams, setTeams }) {
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400"
                   />
                 </div>
+              </div>
+
+              {/* 👑 Designate as Team Captain & Auctioneer (0 PTS) */}
+              <div className="bg-amber-950/30 p-3.5 rounded-2xl border border-amber-500/40 space-y-1.5">
+                <label className="text-xs font-bold text-amber-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Crown className="w-4 h-4 text-amber-400" />
+                    Assign as Team Captain & Auctioneer
+                  </span>
+                  <span className="text-[9px] text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded font-mono">0 Credit (₹0 PTS)</span>
+                </label>
+                <select
+                  value={editFormData.captainOfTeamId}
+                  onChange={(e) => setEditFormData({ ...editFormData, captainOfTeamId: e.target.value })}
+                  className="w-full bg-slate-900 border border-amber-500/50 rounded-xl px-3 py-2 text-amber-200 text-xs font-semibold focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="">-- None (Regular Available Player) --</option>
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.logo} {t.name} ({t.shortName})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Assigning this player to a team places them in the squad with <strong>0 Credit</strong> as the playing Captain & Auctioneer.
+                </p>
+              </div>
+
+              {/* ⚡ Grant Auctioneer Console Login Access */}
+              <div className="bg-cyan-950/25 p-3.5 rounded-2xl border border-cyan-500/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.grantAuctioneerAccess}
+                      onChange={(e) => setEditFormData({ ...editFormData, grantAuctioneerAccess: e.target.checked })}
+                      className="rounded text-cyan-500 focus:ring-cyan-400 cursor-pointer"
+                    />
+                    <Zap className="w-4 h-4 text-cyan-400" />
+                    <span>Grant Auctioneer Bidding Console Login Access</span>
+                  </label>
+                  <span className="text-[9px] text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded font-mono">🔨 Auction Member</span>
+                </div>
+
+                {editFormData.grantAuctioneerAccess && (
+                  <div className="grid grid-cols-2 gap-2.5 pt-1 animate-fade-in">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-400 block mb-1">Login Email</label>
+                      <input
+                        type="email"
+                        value={editFormData.auctioneerEmail}
+                        onChange={(e) => setEditFormData({ ...editFormData, auctioneerEmail: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                        placeholder="player@nepl.in"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-400 block mb-1">Login Password</label>
+                      <input
+                        type="text"
+                        value={editFormData.auctioneerPassword}
+                        onChange={(e) => setEditFormData({ ...editFormData, auctioneerPassword: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-amber-300 font-mono text-xs focus:outline-none focus:border-cyan-400"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
