@@ -16,8 +16,12 @@ import {
   Shield,
   UserCheck,
   FileCode2,
+  Bot,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useTheme } from '../utils/theme';
 import AuctioneerManagerModal from './AuctioneerManagerModal';
 
 export default function Header({ 
@@ -30,8 +34,10 @@ export default function Header({
   onResetData,
   players = [],
   setPlayers,
+  onOpenAiChat,
 }) {
   const { user, logout, can, roleConfig } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
 
@@ -47,41 +53,41 @@ export default function Header({
   const tabs = allTabs.filter(t => can(t.permission));
 
   return (
-    <header className="sticky top-0 z-40 bg-[#070b14]/85 backdrop-blur-xl border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-[72px]">
+    <header className="sticky top-0 z-40 bg-[#141413]/90 backdrop-blur-xl border-b border-stone-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      <div className="max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
+        <div className="flex items-center justify-between h-16">
           
           {/* ── Logo & Branding ── */}
           <div 
-            className="flex items-center space-x-3 cursor-pointer group" 
+            className="flex items-center space-x-2.5 cursor-pointer group shrink-0" 
             onClick={() => setActiveTab(tabs[0]?.id || 'auction')}
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-neon-violet p-[2px] shadow-[0_0_20px_rgba(0,242,254,0.4)] group-hover:shadow-[0_0_30px_rgba(0,242,254,0.7)] transition-all duration-300 flex-shrink-0">
-              <div className="w-full h-full bg-[#070b14] rounded-[14px] flex items-center justify-center">
-                <Gavel className="w-5 h-5 text-cyan-400 transform -rotate-45 group-hover:scale-110 transition-transform duration-300" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#cc785c] via-[#e07a5f] to-[#d97706] p-[1.5px] shadow-[0_2px_12px_rgba(204,120,92,0.3)] group-hover:shadow-[0_4px_18px_rgba(204,120,92,0.45)] transition-all duration-200 shrink-0">
+              <div className="w-full h-full bg-[#141413] rounded-[10px] flex items-center justify-center">
+                <Gavel className="w-4 h-4 text-[#cc785c] transform -rotate-45 group-hover:scale-110 transition-transform" />
               </div>
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-xl font-black tracking-wider gradient-text-brand font-display uppercase">
-                  NYATI ERA
+                <h1 className="text-sm sm:text-base font-extrabold tracking-tight gradient-text-brand font-sans leading-none">
+                  Nyati Era
                 </h1>
-                <span className="hidden sm:inline-flex px-2.5 py-0.5 text-[9px] font-black tracking-widest uppercase rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 shadow-[0_0_10px_rgba(0,242,254,0.2)]">
+                <span className="hidden sm:inline-flex px-2 py-0.2 text-[9px] font-bold tracking-wider uppercase rounded-full bg-[#cc785c]/10 text-[#cc785c] border border-[#cc785c]/25 font-sans">
                   2026+
                 </span>
-                <span className="hidden md:inline-flex px-2.5 py-0.5 text-[10px] font-semibold rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 shadow-[0_0_10px_rgba(121,40,202,0.2)] font-serif tracking-wide">
+                <span className="hidden xl:inline-flex px-2 py-0.2 text-[9px] font-semibold rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25 font-serif italic">
                   कर्मण्येवाधिकारस्ते
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 flex items-center gap-1.5 font-medium tracking-wide">
-                Box Cricket League · 2026 Onwards
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
+              <p className="text-[10px] text-stone-400 flex items-center gap-1.5 font-medium mt-0.5">
+                Box Cricket League
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               </p>
             </div>
           </div>
 
-          {/* ── Center Cyber Navigation ── */}
-          <nav className="hidden lg:flex items-center space-x-1 bg-[#0b1120]/90 p-1.5 rounded-2xl border border-cyan-500/20 shadow-inner">
+          {/* ── Center Anthropic Navigation ── */}
+          <nav className="hidden lg:flex items-center space-x-1 bg-[#1c1b1a]/90 p-1 rounded-xl border border-stone-800 shadow-sm mx-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -89,32 +95,32 @@ export default function Header({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-display font-semibold text-xs tracking-wide transition-all duration-200 cursor-pointer ${
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 shadow-[0_0_20px_rgba(0,242,254,0.45)] scale-[1.03]'
-                      : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800/50'
+                      ? 'bg-[#faf9f5] text-[#141413] shadow-sm font-bold scale-[1.01]'
+                      : 'text-stone-400 hover:text-[#faf9f5] hover:bg-stone-800/60'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#141413]' : 'text-stone-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
             })}
           </nav>
 
-          {/* ── Right Cyber Controls ── */}
-          <div className="flex items-center space-x-2.5">
+          {/* ── Right Controls ── */}
+          <div className="flex items-center space-x-2 shrink-0">
             {/* API Docs */}
             <a
               href="/api/docs"
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:flex items-center space-x-1.5 text-[11px] px-3 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,242,254,0.15)] transition"
-              title="Interactive OpenAPI 3.0 / Swagger UI Docs"
+              className="hidden md:flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-300 border border-stone-800 transition"
+              title="Interactive OpenAPI 3.0 Docs"
             >
-              <FileCode2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="font-bold font-display uppercase tracking-wider text-[10px]">API Docs</span>
-              <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+              <FileCode2 className="w-3.5 h-3.5 text-[#cc785c]" />
+              <span className="font-semibold text-[11px]">API</span>
+              <ExternalLink className="w-2.5 h-2.5 text-stone-500" />
             </a>
 
             {/* CricHeroes */}
@@ -122,18 +128,18 @@ export default function Header({
               href="https://cricheroes.com"
               target="_blank"
               rel="noreferrer"
-              className="hidden md:flex items-center space-x-1.5 text-[11px] px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(255,183,3,0.15)] transition"
+              className="hidden xl:flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-amber-300 border border-amber-500/25 transition"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span className="font-bold">CricHeroes</span>
-              <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span className="font-semibold text-[11px]">CricHeroes</span>
+              <ExternalLink className="w-2.5 h-2.5 text-stone-500" />
             </a>
 
             {/* Manage Auctioneers — Super Admin Only */}
             {can('canManageUsers') && (
               <button
                 onClick={() => setIsManagerOpen(true)}
-                className="hidden sm:flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-display font-bold text-[10px] uppercase tracking-wider shadow-[0_0_15px_rgba(121,40,202,0.25)] transition"
+                className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/25 font-bold text-[11px] transition"
                 title="Manage Auctioneers & Access"
               >
                 <UserCheck className="w-3.5 h-3.5 text-purple-400" />
@@ -141,28 +147,49 @@ export default function Header({
               </button>
             )}
 
+            {/* Dark / Modern White Theme Transformation Toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                isDark
+                  ? 'bg-stone-900 hover:bg-stone-800 text-amber-300 border-stone-800'
+                  : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200 shadow-sm'
+              }`}
+              title={isDark ? "Switch to Modern Clean White Mode" : "Switch to Anthropic Dark Mode"}
+              aria-label="Toggle Dark/White Color Theme"
+            >
+              {isDark ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-[#cc785c]" />
+              )}
+              <span className="hidden md:inline-block font-bold text-[10px] uppercase tracking-wider">
+                {isDark ? 'Dark' : 'White'}
+              </span>
+            </button>
+
             {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2.5 rounded-xl border transition ${
+              className={`p-2 rounded-xl border transition ${
                 soundEnabled
-                  ? 'bg-slate-900 text-cyan-400 border-cyan-500/30 hover:bg-slate-800 shadow-[0_0_12px_rgba(0,242,254,0.2)]'
-                  : 'bg-slate-950 text-slate-600 border-slate-800 hover:bg-slate-900'
+                  ? 'bg-stone-900 text-[#cc785c] border-stone-800 hover:bg-stone-800'
+                  : 'bg-stone-950 text-stone-600 border-stone-900 hover:bg-stone-900'
               }`}
               title={soundEnabled ? 'Mute Sound FX' : 'Enable Sound FX'}
             >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             </button>
 
             {/* Projector / TV Screen */}
             {can('canAccessProjector') && (
               <button
                 onClick={() => setIsProjectorMode(!isProjectorMode)}
-                className="hidden sm:flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-display font-black text-[10px] uppercase tracking-wider shadow-[0_0_18px_rgba(255,183,3,0.4)] hover:brightness-110 transition cursor-pointer"
+                className="hidden sm:flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-bold text-[11px] uppercase tracking-wider transition cursor-pointer"
                 title="Toggle Projector / TV Display Mode"
               >
                 <Tv className="w-3.5 h-3.5" />
-                <span>TV Screen</span>
+                <span>TV</span>
               </button>
             )}
 
@@ -171,16 +198,16 @@ export default function Header({
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(v => !v)}
-                  className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-cyan-500/25 hover:border-cyan-400/50 transition shadow-md"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 hover:border-stone-700 transition shadow-sm"
                 >
-                  <span className="text-base leading-none">{user.avatar}</span>
+                  <span className="text-sm leading-none">{user.avatar}</span>
                   <div className="hidden sm:block text-left">
-                    <div className="text-xs font-bold text-slate-100 leading-tight font-display">{user.name}</div>
-                    <div className="text-[9px] font-semibold text-cyan-400 uppercase tracking-wider">
+                    <div className="text-xs font-bold text-sand-100 leading-tight">{user.name}</div>
+                    <div className="text-[8px] font-semibold text-[#cc785c] uppercase tracking-wider">
                       {roleConfig?.label}
                     </div>
                   </div>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 text-stone-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Dropdown */}
@@ -233,26 +260,40 @@ export default function Header({
           </div>
         </div>
 
-        {/* ── Mobile Cyber Tab Bar ── */}
-        <div className="flex lg:hidden overflow-x-auto py-2.5 space-x-2 border-t border-cyan-500/15 no-scrollbar">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs whitespace-nowrap font-display font-semibold transition ${
-                  isActive
-                    ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 shadow-[0_0_15px_rgba(0,242,254,0.4)]'
-                    : 'bg-slate-900 text-slate-400 border border-slate-800'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        {/* ── Mobile Cyber Tab Bar + Theme Switcher ── */}
+        <div className="flex lg:hidden items-center justify-between py-2.5 border-t border-cyan-500/15 gap-2">
+          <div className="flex overflow-x-auto space-x-2 no-scrollbar py-0.5">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs whitespace-nowrap font-display font-semibold transition ${
+                    isActive
+                      ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 shadow-[0_0_15px_rgba(0,242,254,0.4)]'
+                      : 'bg-slate-900 text-slate-400 border border-slate-800'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={toggleTheme}
+            className={`p-2 rounded-xl border shrink-0 transition ${
+              isDark
+                ? 'bg-slate-900 text-amber-300 border-amber-500/30'
+                : 'bg-white text-slate-800 border-slate-300'
+            }`}
+            title="Toggle Dark / White Theme"
+          >
+            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+          </button>
         </div>
       </div>
 

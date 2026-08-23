@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   BookOpen, Trophy, Gavel, Clock, Users, ShieldAlert, XCircle, 
-  Zap, UserCheck, Gift, CloudRain, UtensilsCrossed, Plus, Trash2, X, Lock, Database, Edit3,
+  Zap, UserCheck, Gift, CloudRain, UtensilsCrossed, Plus, Trash2, X, Lock, Database, Edit3, Sparkles
 } from 'lucide-react';
 import { TOURNAMENT_RULES } from '../data/initialData';
 import { useAuth } from '../auth/AuthContext';
 import { addRule as apiAddRule, deleteRule as apiDeleteRule, isMongoDB } from '../services/api';
+import NEFLFormatView from './NEFLFormatView';
 
-export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
+export default function RulesHub({ rules = TOURNAMENT_RULES, setRules, onOpenAiChat }) {
   const { user, can } = useAuth();
   const isSuperAdmin = user?.role === 'superuser';
   const canManage = isSuperAdmin || can('canResetData') || can('canManageUsers');
+
+  // Format Tab: 'nefl' (NEFL 2026 Summer Season) or 'standard' (Standard Rulebook)
+  const [activeFormatTab, setActiveFormatTab] = useState('nefl');
 
   // ── Persistent Official Prize Pool State ───────────────────────────────────
   const [prizePool, setPrizePool] = useState(() => {
@@ -159,43 +163,87 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
 
   return (
     <div className="space-y-6">
-      
-      {/* Banner */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-warm-700/50 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-terracotta-600/8 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="flex items-center space-x-2 mb-3">
-              <span className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-terracotta-600/15 text-terracotta-300 text-xs font-extrabold uppercase border border-terracotta-500/25">
-                <BookOpen className="w-3.5 h-3.5" />
-                OFFICIAL LEAGUE DIRECTIVE
-              </span>
-              <span className="inline-flex items-center gap-1 text-sand-400 text-xs font-mono bg-warm-900 px-2.5 py-1 rounded-lg border border-warm-700">
-                <Database className="w-3 h-3 text-emerald-400" />
-                {isMongoDB ? 'MongoDB Atlas Synced' : 'Local Storage'} ({rules.length} Rules)
-              </span>
-            </div>
 
-            <h2 className="text-3xl font-black text-sand-100 tracking-tight font-serif">
-              NEPL Tournament Guidelines & Rules
-            </h2>
-            <p className="text-sand-500 text-xs mt-2 max-w-2xl">
-              Official rules for Nyati Era Box Cricket League. Stored live in MongoDB Atlas table. All team captains, owners, and players must strictly abide by these directives.
-            </p>
-          </div>
+      {/* Format Selector Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2 bg-[#0b1120] border border-cyan-500/30 rounded-2xl shadow-lg">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveFormatTab('nefl')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-sans font-extrabold text-xs tracking-normal transition-all cursor-pointer ${
+              activeFormatTab === 'nefl'
+                ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 shadow-[0_0_20px_rgba(0,242,254,0.4)] scale-[1.02]'
+                : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>NEPL (Nyati Era Premiere League) 2026 Season</span>
+          </button>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Super Admin Add Rule Button */}
-            {canManage && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl bg-terracotta-600 hover:bg-terracotta-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-terracotta-600/20 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Rule</span>
-              </button>
-            )}
+          <button
+            onClick={() => setActiveFormatTab('standard')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-sans font-extrabold text-xs tracking-normal transition-all cursor-pointer ${
+              activeFormatTab === 'standard'
+                ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] scale-[1.02]'
+                : 'text-slate-400 hover:text-purple-300 hover:bg-slate-800/40'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Standard Directives ({rules.length})</span>
+          </button>
+        </div>
+
+        {onOpenAiChat && (
+          <button
+            onClick={onOpenAiChat}
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition cursor-pointer"
+          >
+            <Zap className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Ask Gemini AI Bot</span>
+          </button>
+        )}
+      </div>
+
+      {/* If NEFL Format is active, render NEFLFormatView */}
+      {activeFormatTab === 'nefl' ? (
+        <NEFLFormatView onOpenAiChat={onOpenAiChat} rules={rules} setRules={setRules} />
+      ) : (
+        <>
+          {/* Banner */}
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-warm-700/50 relative overflow-hidden">
+            <div className="absolute right-0 top-0 w-96 h-96 bg-terracotta-600/8 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+              <div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-terracotta-600/15 text-terracotta-300 text-xs font-bold border border-terracotta-500/25">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Official League Directive</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-sand-400 text-xs font-mono bg-warm-900 px-2.5 py-1 rounded-lg border border-warm-700">
+                    <Database className="w-3 h-3 text-emerald-400" />
+                    {isMongoDB ? 'MongoDB Atlas Synced' : 'Local Storage'} ({rules.length} Rules)
+                  </span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-sand-100 tracking-tight font-sans">
+                  NEPL Tournament Guidelines & Rules
+                </h2>
+                <p className="text-sand-500 text-xs mt-2 max-w-2xl">
+                  Official rules for Nyati Era Box Cricket League. Stored live in MongoDB Atlas table. All team captains, owners, and players must strictly abide by these directives.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Super Admin Add Rule Button */}
+                {canManage && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl bg-terracotta-600 hover:bg-terracotta-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-terracotta-600/20 transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Rule</span>
+                  </button>
+                )}
 
             {/* Official Prize Pool Card */}
             <div className="bg-gradient-to-tr from-[#c9a227]/25 via-[#c9a227]/15 to-[#c9a227]/30 p-5 rounded-2xl border border-[#c9a227]/40 shadow-xl flex items-center justify-between min-w-[260px] relative overflow-hidden">
@@ -243,8 +291,8 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
         <div className="glass-panel p-5 rounded-2xl border border-red-500/25 bg-red-950/15 flex items-start space-x-3">
           <UserCheck className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-extrabold text-sand-100 text-sm">Final Decision Authority</h4>
-            <p className="text-xs text-sand-400 mt-1">
+            <h4 className="font-extrabold text-sand-100 text-sm sm:text-base font-sans leading-snug">Final Decision Authority</h4>
+            <p className="text-xs text-sand-400 mt-1 font-sans">
               Umpire decision is final. For major disputes, <strong className="text-sand-200">FINAL decision by Harish & Santosh</strong>.
             </p>
           </div>
@@ -252,8 +300,8 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
         <div className="glass-panel p-5 rounded-2xl border border-[#c9a227]/25 bg-[#c9a227]/8 flex items-start space-x-3">
           <Users className="w-6 h-6 text-[#c9a227] shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-extrabold text-sand-100 text-sm">Max 6 Players On Field</h4>
-            <p className="text-xs text-sand-400 mt-1">
+            <h4 className="font-extrabold text-sand-100 text-sm sm:text-base font-sans leading-snug">Max 6 Players On Field</h4>
+            <p className="text-xs text-sand-400 mt-1 font-sans">
               8 players per squad. <strong className="text-sand-200">Only 6 allowed on field</strong> at any time. Captains must rotate!
             </p>
           </div>
@@ -261,8 +309,8 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
         <div className="glass-panel p-5 rounded-2xl border border-cricket-emerald/25 bg-cricket-emerald/8 flex items-start space-x-3">
           <UtensilsCrossed className="w-6 h-6 text-cricket-emerald shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-extrabold text-sand-100 text-sm">Sunday 8 PM & Dinner Party</h4>
-            <p className="text-xs text-sand-400 mt-1">
+            <h4 className="font-extrabold text-sand-100 text-sm sm:text-base font-sans leading-snug">Sunday 8 PM & Dinner Party</h4>
+            <p className="text-xs text-sand-400 mt-1 font-sans">
               Finals wrap by Sunday 8 PM followed by a grand community <strong className="text-sand-200">Dinner Party</strong>!
             </p>
           </div>
@@ -304,7 +352,7 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
       </div>
 
       {/* Rules Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {rules.map(rule => {
           const IconComp = iconMap[rule.icon] || BookOpen;
           return (
@@ -333,10 +381,10 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
                   )}
                 </div>
 
-                <h3 className="text-base font-extrabold text-sand-100 font-serif">
+                <h3 className="text-base font-extrabold text-sand-100 font-sans leading-snug">
                   {rule.title}
                 </h3>
-                <p className="text-xs text-sand-400 leading-relaxed">
+                <p className="text-xs text-sand-400 leading-relaxed font-sans">
                   {rule.desc}
                 </p>
               </div>
@@ -344,6 +392,8 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules }) {
           );
         })}
       </div>
+      </>
+      )}
 
       {/* ── Super Admin Edit Prize Pool Modal ── */}
       {showPrizeModal && isSuperAdmin && createPortal(

@@ -7,6 +7,8 @@ import {
   ChevronLeft, 
   ChevronRight, 
   CheckCircle2, 
+  XCircle,
+  RotateCcw,
   Tag, 
   Award,
   Sparkles,
@@ -38,14 +40,16 @@ export default function ProjectorView({
   const canBid = can('canBid');
   const canSell = can('canSellPlayer');
   // ── Player Priority Logic ──────────────────────────────────────────────────
-  // Priority: 1. Available -> 2. Unsold -> 3. Sold (If all players are sold out)
-  const availablePlayers = players.filter(p => p.status === 'available');
-  const unsoldPlayers = players.filter(p => p.status === 'unsold');
-  const soldPlayers = players.filter(p => p.status === 'sold');
+  // Priority: 1. Available -> 2. Unsold -> 3. Sold (Filtered by Playing in NEPL)
+  const playingPool = players.filter(p => p.isPlayingNEPL !== false);
+  const availablePlayers = playingPool.filter(p => p.status === 'available');
+  const unsoldPlayers = playingPool.filter(p => p.status === 'unsold');
+  const soldPlayers = playingPool.filter(p => p.status === 'sold');
 
   const defaultPriorityPlayer = 
     availablePlayers[0] || 
     unsoldPlayers[0] || 
+    playingPool[0] || 
     players[0] || 
     null;
 
@@ -132,6 +136,10 @@ export default function ProjectorView({
   // ── Navigation Handlers ───────────────────────────────────────────────────
   const currentIndex = players.findIndex(p => p.id === activePlayer?.id);
 
+  // Available player pool for seamless profile switching
+  const availablePool = availablePlayers.length > 0 ? availablePlayers : players;
+  const currentAvailableIdx = availablePool.findIndex(p => p.id === activePlayer?.id);
+
   const handlePrevPlayer = () => {
     if (players.length === 0) return;
     const newIdx = currentIndex > 0 ? currentIndex - 1 : players.length - 1;
@@ -142,6 +150,20 @@ export default function ProjectorView({
     if (players.length === 0) return;
     const newIdx = currentIndex < players.length - 1 ? currentIndex + 1 : 0;
     setSelectedId(players[newIdx].id);
+  };
+
+  const handlePrevAvailablePlayer = (e) => {
+    if (e) e.stopPropagation();
+    if (availablePool.length === 0) return;
+    const newIdx = currentAvailableIdx > 0 ? currentAvailableIdx - 1 : availablePool.length - 1;
+    setSelectedId(availablePool[newIdx].id);
+  };
+
+  const handleNextAvailablePlayer = (e) => {
+    if (e) e.stopPropagation();
+    if (availablePool.length === 0) return;
+    const newIdx = currentAvailableIdx < availablePool.length - 1 ? currentAvailableIdx + 1 : 0;
+    setSelectedId(availablePool[newIdx].id);
   };
 
   // ── Quick Bid Handler ─────────────────────────────────────────────────────
@@ -166,7 +188,7 @@ export default function ProjectorView({
     }
 
     const remainingPurse = team.totalPurse - team.spentPurse;
-    const maxSquad = team.maxSquadSize || 8;
+    const maxSquad = team.maxSquadSize || 10;
 
     if (nextBid > remainingPurse) {
       alert(`⚠️ Insufficient Purse: ${team.name} only has ₹${remainingPurse} PTS remaining budget. Cannot place bid of ₹${nextBid} PTS!`);
@@ -245,6 +267,35 @@ export default function ProjectorView({
     }, 1200);
   };
 
+  // ── Mark Unsold Handler ───────────────────────────────────────────────────
+  const handleMarkUnsold = () => {
+    if (!activePlayer || isSoldOut) return;
+    if (!window.confirm(`Mark "${activePlayer.name}" as Unsold in NEPL Auction Pool?`)) return;
+    
+    soundFx.playPass();
+    const updated = {
+      ...activePlayer,
+      status: 'unsold',
+      currentBid: activePlayer.basePrice,
+      leadingTeam: null
+    };
+    setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+    apiUpdatePlayer(activePlayer.id, updated).catch(err => console.warn('MongoDB unsold update error:', err));
+  };
+
+  // ── Revoke Bid Handler ───────────────────────────────────────────────────
+  const handleRevokeBid = () => {
+    if (!activePlayer || isSoldOut || !activePlayer.leadingTeam) return;
+    if (!window.confirm(`Revoke current high bid on "${activePlayer.name}" and reset to Base Price ₹${activePlayer.basePrice} PTS?`)) return;
+    
+    const updated = {
+      ...activePlayer,
+      currentBid: activePlayer.basePrice,
+      leadingTeam: null
+    };
+    setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-[#070b14] text-white flex flex-col justify-between p-4 sm:p-8 select-none overflow-hidden font-sans">
       
@@ -252,7 +303,7 @@ export default function ProjectorView({
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-gradient-to-tr from-cyan-500/10 via-purple-600/10 to-rose-600/10 rounded-full blur-[140px] pointer-events-none"></div>
 
       {/* ── Top TV Header Controls ── */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 z-10 border-b border-cyan-500/20 pb-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 z-10 border-b border-cyan-500/20 pb-4 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto">
         
         {/* Branding */}
         <div className="flex items-center space-x-3">
@@ -261,15 +312,15 @@ export default function ProjectorView({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-wider gradient-text-brand font-display uppercase">
-                NYATI ERA PREMIER LEAGUE 2026+
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight gradient-text-brand font-sans">
+                Nyati Era Premier League 2026+
               </h1>
               <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-serif font-bold shadow-[0_0_12px_rgba(121,40,202,0.3)]">
                 कर्मण्येवाधिकारस्ते
               </span>
             </div>
-            <p className="text-xs text-cyan-400 font-mono font-bold tracking-widest uppercase flex items-center gap-2">
-              LIVE TV PROJECTOR SCREEN
+            <p className="text-xs text-cyan-400 font-mono font-bold flex items-center gap-2">
+              <span>Live TV Projector Screen</span>
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#00ff87]" />
             </p>
           </div>
@@ -321,177 +372,199 @@ export default function ProjectorView({
 
       {/* ── Main Theater Bidding Display ── */}
       {activePlayer ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center z-10 max-w-7xl mx-auto w-full my-auto py-2">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12 items-center z-10 max-w-[1800px] 3xl:max-w-[2100px] mx-auto w-full my-auto py-2">
           
-          {/* Left Column: Player Photo Card & Status Stamp */}
-          <div className="lg:col-span-5 flex flex-col items-center">
-            <div className="relative">
-              {/* Photo Frame */}
-              <div className={`w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border-4 transition-all duration-500 bg-slate-900 relative ${
+          {/* Left Column: Unified Enlarged Player Photo with Side Navigation Arrows */}
+          <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
+            
+            {/* Unified Showcase Card with Side Floating Navigation Arrows */}
+            <div className="relative w-full max-w-[340px] sm:max-w-[400px] xl:max-w-[460px] 2xl:max-w-[500px] 3xl:max-w-[540px] flex items-center justify-center">
+              
+              {/* ⬅️ Previous Player Arrow (Around Picture Left) */}
+              {availablePool.length > 1 && (
+                <button
+                  onClick={handlePrevAvailablePlayer}
+                  className="absolute -left-4 sm:-left-6 top-1/3 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
+                  title="Previous Available Player (←)"
+                >
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover:-translate-x-0.5" />
+                </button>
+              )}
+
+              {/* Showcase Card Frame */}
+              <div className={`w-full rounded-3xl overflow-hidden border-4 transition-all duration-500 bg-slate-900 shadow-2xl relative ${
                 isSoldOut 
-                  ? 'border-rose-500/80 shadow-[0_0_60px_rgba(244,63,94,0.4)]' 
-                  : 'border-cyan-500/50 shadow-[0_0_50px_rgba(0,242,254,0.3)]'
+                  ? 'border-rose-500/80 shadow-[0_0_60px_rgba(244,63,94,0.45)]' 
+                  : 'border-cyan-500/50 shadow-[0_0_50px_rgba(0,242,254,0.35)]'
               }`}>
-                <img
-                  src={activePlayer.avatarUrl}
-                  alt={activePlayer.name}
-                  className={`w-full h-full object-cover transition-all duration-500 ${isSoldOut ? 'grayscale-[30%] brightness-75' : ''}`}
-                  onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
-                  }}
-                />
+                
+                {/* Photo Area */}
+                <div className="h-72 sm:h-80 xl:h-[380px] 2xl:h-[420px] 3xl:h-[460px] w-full relative overflow-hidden bg-slate-950">
+                  <img
+                    key={activePlayer.id}
+                    src={activePlayer.avatarUrl}
+                    alt={activePlayer.name}
+                    className={`w-full h-full object-cover object-[center_15%] scale-105 transition-all duration-500 animate-fade-in ${isSoldOut ? 'grayscale-[30%] brightness-75' : ''}`}
+                    onError={(e) => {
+                      e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+                    }}
+                  />
 
-                {/* 🔴 PROMINENT SOLD OUT STAMP OVERLAY */}
-                {isSoldOut && (
-                  <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-[2px] flex flex-col items-center justify-center p-4">
-                    <div className="transform -rotate-12 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white font-black text-3xl sm:text-4xl uppercase tracking-widest px-8 py-2.5 rounded-2xl shadow-[0_0_35px_rgba(244,63,94,0.8)] border-2 border-white/40 animate-pulse flex items-center gap-2">
-                      <Tag className="w-7 h-7" />
-                      <span>SOLD OUT</span>
+                  {/* 🔴 PROMINENT SOLD OUT STAMP OVERLAY */}
+                  {isSoldOut && (
+                    <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-[2px] flex flex-col items-center justify-center p-3">
+                      <div className="transform -rotate-12 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white font-black text-2xl sm:text-3xl uppercase tracking-widest px-6 py-2 rounded-2xl shadow-[0_0_25px_rgba(244,63,94,0.8)] border-2 border-white/40 animate-pulse flex items-center gap-2">
+                        <Tag className="w-5 h-5" />
+                        <span>SOLD OUT</span>
+                      </div>
+
+                      <div className="mt-3 text-center space-y-0.5">
+                        <span className="text-[10px] uppercase text-slate-400 font-bold block tracking-wider">Final Sold Price</span>
+                        <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono drop-shadow-[0_0_12px_rgba(0,255,135,0.5)]">
+                          ₹{activePlayer.soldPrice || currentBid} PTS
+                        </span>
+                      </div>
+
+                      {buyerTeamObj && (
+                        <div className="mt-2 bg-slate-900/90 px-3 py-1 rounded-xl border border-rose-500/40 flex items-center space-x-1.5 shadow-md">
+                          <span className="font-bold text-white text-xs">{buyerTeamObj.name}</span>
+                        </div>
+                      )}
                     </div>
+                  )}
 
-                    <div className="mt-4 text-center space-y-1">
-                      <span className="text-xs uppercase text-slate-400 font-bold block tracking-wider">Final Sold Price</span>
-                      <span className="text-3xl font-black text-emerald-400 font-mono drop-shadow-[0_0_15px_rgba(0,255,135,0.5)]">
-                        ₹{activePlayer.soldPrice || currentBid} PTS
+                  {/* Category Pill Badge */}
+                  <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-cyan-500/50 text-cyan-300 font-black text-xs uppercase tracking-wider shadow-lg">
+                    {activePlayer.category}
+                  </div>
+                </div>
+
+                {/* ⚡ Combined Performance Score Bottom Bar */}
+                <div className="bg-[#070b14]/95 backdrop-blur-xl border-t border-cyan-500/30 p-3.5 sm:p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <span 
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-bold shadow-md shrink-0"
+                        style={{ backgroundColor: `${perf.tierColor}25`, border: `1px solid ${perf.tierColor}60` }}
+                      >
+                        {perf.badge}
+                      </span>
+                      <div title="OPR: Overall Performance Rating (60-99)">
+                        <span className="text-[10px] font-bold text-slate-400 block tracking-wider font-sans">Overall Performance Rating</span>
+                        <span className="text-xs font-black uppercase font-sans tracking-wide" style={{ color: perf.tierColor }}>{perf.tier}</span>
+                      </div>
+                    </div>
+                    <div className="text-right" title="OPR (Overall Performance Rating): Composite score based on Runs, Strike Rate, Wickets, Economy & Match Impact">
+                      <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight" style={{ color: perf.tierColor }}>
+                        {perf.ovr} <span className="text-xs text-slate-400 font-bold font-sans">OPR</span>
                       </span>
                     </div>
+                  </div>
 
-                    {buyerTeamObj && (
-                      <div className="mt-3 bg-slate-900/90 px-4 py-1.5 rounded-xl border border-rose-500/40 flex items-center space-x-2 shadow-lg">
-                        <span className="text-2xl">{buyerTeamObj.logo}</span>
-                        <span className="font-bold text-white text-sm">{buyerTeamObj.name}</span>
+                  {/* Performance Rating Sub-Gauges */}
+                  <div className="space-y-1.5 pt-0.5 text-[11px] font-mono">
+                    <div>
+                      <div className="flex justify-between text-slate-300 text-[10px] mb-0.5">
+                        <span className="flex items-center gap-1 font-bold text-amber-300 font-sans">
+                          <Flame className="w-3 h-3 text-amber-400" /> Bat Power
+                        </span>
+                        <span className="text-amber-300 font-bold">{perf.battingRating} / 100</span>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                        <div 
+                          className="h-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all duration-700 rounded-full" 
+                          style={{ width: `${perf.battingRating}%` }} 
+                        />
+                      </div>
+                    </div>
 
-              {/* Category Pill Badge */}
-              <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-cyan-500/50 text-cyan-300 font-black text-xs uppercase tracking-wider shadow-lg">
-                {activePlayer.category}
-              </div>
-            </div>
+                    <div>
+                      <div className="flex justify-between text-slate-300 text-[10px] mb-0.5">
+                        <span className="flex items-center gap-1 font-bold text-cyan-300 font-sans">
+                          <Target className="w-3 h-3 text-cyan-400" /> Bowl Accuracy
+                        </span>
+                        <span className="text-cyan-300 font-bold">{perf.bowlingRating} / 100</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                        <div 
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-400 transition-all duration-700 rounded-full" 
+                          style={{ width: `${perf.bowlingRating}%` }} 
+                        />
+                      </div>
+                    </div>
 
-            {/* ⚡ NEPL Performance Score & Power Index Card */}
-            <div className="w-full mt-3 bg-slate-900/90 p-4 rounded-2xl border border-cyan-500/30 shadow-xl space-y-3 max-w-[320px]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span 
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-bold shadow-lg"
-                    style={{ backgroundColor: `${perf.tierColor}25`, border: `1px solid ${perf.tierColor}60` }}
-                  >
-                    {perf.badge}
-                  </span>
-                  <div>
-                    <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">PERFORMANCE SCORE</span>
-                    <span className="text-xs font-black uppercase" style={{ color: perf.tierColor }}>{perf.tier}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black font-mono tracking-tight" style={{ color: perf.tierColor }}>
-                    {perf.ovr} <span className="text-xs text-slate-400 font-bold">OVR</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Performance Rating Sub-Gauges */}
-              <div className="space-y-2 pt-1 text-[11px] font-mono">
-                <div>
-                  <div className="flex justify-between text-slate-300 text-[10px] mb-0.5">
-                    <span className="flex items-center gap-1 font-bold text-amber-300">
-                      <Flame className="w-3 h-3 text-amber-400" /> BAT POWER
-                    </span>
-                    <span className="text-amber-300 font-bold">{perf.battingRating} / 100</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                    <div 
-                      className="h-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all duration-700" 
-                      style={{ width: `${perf.battingRating}%` }} 
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 text-[10px] mb-0.5">
-                    <span className="flex items-center gap-1 font-bold text-cyan-300">
-                      <Target className="w-3 h-3 text-cyan-400" /> BOWL ACCURACY
-                    </span>
-                    <span className="text-cyan-300 font-bold">{perf.bowlingRating} / 100</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                    <div 
-                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-400 transition-all duration-700" 
-                      style={{ width: `${perf.bowlingRating}%` }} 
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 text-[10px] mb-0.5">
-                    <span className="flex items-center gap-1 font-bold text-emerald-300">
-                      <Zap className="w-3 h-3 text-emerald-400" /> MATCH IMPACT
-                    </span>
-                    <span className="text-emerald-300 font-bold">
-                      {perf.impactRating}% <span className="text-[9px] text-slate-400 font-normal">({perf.impactPointsPerMatch} pts/g)</span>
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                    <div 
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700" 
-                      style={{ width: `${perf.impactRating}%` }} 
-                    />
+                    <div>
+                      <div className="flex justify-between text-slate-300 text-[10px] mb-0.5">
+                        <span className="flex items-center gap-1 font-bold text-emerald-300 font-sans">
+                          <Zap className="w-3 h-3 text-emerald-400" /> Match Impact
+                        </span>
+                        <span className="text-emerald-300 font-bold">
+                          {perf.impactRating}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                        <div 
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700 rounded-full" 
+                          style={{ width: `${perf.impactRating}%` }} 
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* ➡️ Next Player Arrow (Around Picture Right) */}
+              {availablePool.length > 1 && (
+                <button
+                  onClick={handleNextAvailablePlayer}
+                  className="absolute -right-4 sm:-right-6 top-1/3 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
+                  title="Next Available Player (→)"
+                >
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover:translate-x-0.5" />
+                </button>
+              )}
             </div>
             
             {/* CricHeroes Link */}
-            <a
-              href={activePlayer.cricHeroesUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2.5 flex items-center space-x-2 text-xs text-amber-300 hover:text-amber-200 font-bold bg-slate-900/90 px-4 py-2 rounded-xl border border-amber-500/30 transition shadow-md"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Verified CricHeroes.com Player Profile</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+            {activePlayer.cricHeroesUrl && (
+              <a
+                href={activePlayer.cricHeroesUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full max-w-[340px] sm:max-w-[400px] xl:max-w-[460px] 2xl:max-w-[500px] 3xl:max-w-[540px] mt-2 flex items-center justify-center space-x-1.5 text-xs text-amber-300 hover:text-amber-200 font-bold bg-slate-900/90 px-3 py-1.5 rounded-xl border border-amber-500/30 transition shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>CricHeroes Profile</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
 
           {/* Right Column: Player Stats, Bidding Box & Controls */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="lg:col-span-7 space-y-3">
             
-            {/* Role, OVR Badge & Player Name */}
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <span className="px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 font-bold text-xs border border-cyan-500/30">
+            {/* ── Justified Player Name & Badges Header ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-2.5">
+              <h2 className="text-2xl sm:text-3xl xl:text-4xl font-extrabold text-white tracking-tight font-sans">
+                {activePlayer.name}
+              </h2>
+
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {/* Role Badge */}
+                <span className="px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 font-bold text-xs border border-cyan-500/30 font-sans">
                   {activePlayer.role}
                 </span>
 
-                {/* Performance OVR Pill */}
-                <span 
-                  className="px-2.5 py-0.5 rounded-full text-xs font-black font-mono border flex items-center gap-1 shadow-[0_0_12px]"
-                  style={{
-                    backgroundColor: `${perf.tierColor}20`,
-                    borderColor: `${perf.tierColor}50`,
-                    color: perf.tierColor,
-                    boxShadow: `0 0 10px ${perf.tierColor}35`
-                  }}
-                >
-                  <span>{perf.badge} {perf.ovr} OVR</span>
-                  <span className="text-[10px] opacity-80 font-sans">• {perf.tier}</span>
-                </span>
-
-                {(activePlayer.isCaptain || activePlayer.captainOfTeamId || (activePlayer.status === 'sold' && activePlayer.soldPrice === 0 && activePlayer.soldTo)) && (
-                  <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40 flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.3)]">
+                {Boolean(activePlayer.isCaptain || activePlayer.captainOfTeamId || teams.some(t => t.captainId === activePlayer.id || t.squad?.some(s => s.id === activePlayer.id && s.isCaptain))) && (
+                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40 flex items-center gap-1 font-sans shadow-sm">
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Captain & Auctioneer (0 PTS)</span>
+                    <span>Captain (0 PTS)</span>
                   </span>
                 )}
                 
                 {/* Live vs Sold Status Tag */}
                 {isSoldOut ? (
-                  <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 font-black text-xs border border-rose-500/40 uppercase tracking-wider flex items-center gap-1 shadow-[0_0_12px_rgba(244,63,94,0.3)]">
+                  <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 font-black text-xs border border-rose-500/40 uppercase tracking-wider flex items-center gap-1 shadow-sm">
                     <Lock className="w-3 h-3" />
                     <span>SOLD OUT</span>
                   </span>
@@ -502,110 +575,81 @@ export default function ProjectorView({
                   </span>
                 )}
               </div>
+            </div>
 
-              <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight font-display">
-                {activePlayer.name}
-              </h2>
-
-              {/* Tournament Match Statistics Grid */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 text-center font-mono mt-3 shadow-inner">
-                <div className="p-1">
-                  <span className="text-[9px] text-slate-500 uppercase block font-semibold">Matches</span>
-                  <span className="text-sm font-black text-slate-100">{activePlayer.matches || 0}</span>
-                </div>
-                <div className="p-1 border-l border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block font-semibold">Runs</span>
-                  <span className="text-sm font-black text-emerald-400">{activePlayer.runs || 0}</span>
-                </div>
-                <div className="p-1 border-l border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block font-semibold">Strike Rate</span>
-                  <span className="text-sm font-black text-amber-400">{activePlayer.strikeRate || 0}</span>
-                </div>
-                <div className="p-1 border-l border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block font-semibold">Average</span>
-                  <span className="text-sm font-black text-slate-200">{activePlayer.avg || 0}</span>
-                </div>
-                <div className="p-1 border-l border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block font-semibold">Wickets</span>
-                  <span className="text-sm font-black text-cyan-400">{activePlayer.wickets || 0}</span>
-                </div>
-                <div className="p-1 border-l border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase block font-semibold">Econ / Best</span>
-                  <span className="text-[11px] font-black text-purple-300 leading-tight block">
-                    {activePlayer.economy || '—'} <span className="text-[9px] text-slate-400">({activePlayer.bestBowling || '—'})</span>
-                  </span>
-                </div>
+            {/* Tournament Match Statistics Grid */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800 text-center font-mono shadow-md">
+              <div className="p-2 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                <span className="text-[11px] text-slate-400 font-sans font-bold block">Matches</span>
+                <span className="text-lg sm:text-xl font-black text-slate-100">{activePlayer.matches || 0}</span>
+              </div>
+              <div className="p-2 bg-slate-950/60 rounded-xl border border-emerald-500/20">
+                <span className="text-[11px] text-emerald-400/90 font-sans font-bold block">Runs</span>
+                <span className="text-lg sm:text-xl font-black text-emerald-400">{activePlayer.runs || 0}</span>
+              </div>
+              <div className="p-2 bg-slate-950/60 rounded-xl border border-amber-500/20">
+                <span className="text-[11px] text-amber-400/90 font-sans font-bold block">Strike Rate</span>
+                <span className="text-lg sm:text-xl font-black text-amber-400">{activePlayer.strikeRate || 0}</span>
+              </div>
+              <div className="p-2 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                <span className="text-[11px] text-slate-400 font-sans font-bold block">Average</span>
+                <span className="text-lg sm:text-xl font-black text-slate-200">{activePlayer.avg || 0}</span>
+              </div>
+              <div className="p-2 bg-slate-950/60 rounded-xl border border-cyan-500/20">
+                <span className="text-[11px] text-cyan-400/90 font-sans font-bold block">Wickets</span>
+                <span className="text-lg sm:text-xl font-black text-cyan-400">{activePlayer.wickets || 0}</span>
+              </div>
+              <div className="p-2 bg-slate-950/60 rounded-xl border border-purple-500/20">
+                <span className="text-[11px] text-purple-300 font-sans font-bold block">Economy</span>
+                <span className="text-lg sm:text-xl font-black text-purple-300 block">
+                  {activePlayer.economy || '—'}
+                </span>
               </div>
             </div>
 
             {/* Price Box */}
-            <div className={`p-6 rounded-3xl backdrop-blur-xl border shadow-2xl flex items-center justify-between transition-all duration-300 ${
+            <div className={`p-4 sm:p-5 rounded-2xl backdrop-blur-xl border shadow-xl flex items-center justify-between transition-all duration-300 ${
               isSoldOut 
                 ? 'bg-rose-950/40 border-rose-500/40 shadow-rose-950/50' 
                 : 'bg-slate-900/90 border-cyan-500/30 shadow-cyan-950/50'
             }`}>
               <div>
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Base Price</span>
-                <span className="text-2xl font-bold text-slate-200 font-mono">₹{activePlayer.basePrice} PTS</span>
+                <span className="text-xl sm:text-2xl font-bold text-slate-200 font-mono">₹{activePlayer.basePrice} PTS</span>
               </div>
 
               <div className="text-right">
-                <span className={`text-xs font-extrabold uppercase tracking-widest block ${isSoldOut ? 'text-rose-400' : 'text-cyan-400'}`}>
+                <span className={`text-[11px] font-extrabold uppercase tracking-widest block ${isSoldOut ? 'text-rose-400' : 'text-cyan-400'}`}>
                   {isSoldOut ? 'FINAL SOLD PRICE' : 'CURRENT HIGH BID'}
                 </span>
-                <span className={`text-4xl sm:text-6xl font-black font-mono drop-shadow-md ${
-                  isSoldOut ? 'text-emerald-400' : 'text-cyan-300 drop-shadow-[0_0_25px_rgba(0,242,254,0.5)]'
+                <span className={`text-3xl sm:text-5xl font-black font-mono drop-shadow-md ${
+                  isSoldOut ? 'text-emerald-400' : 'text-cyan-300 drop-shadow-[0_0_20px_rgba(0,242,254,0.4)]'
                 }`}>
                   ₹{currentBid} PTS
                 </span>
               </div>
             </div>
 
-            {/* Leading / Buyer Team Banner with CAPTAIN PHOTO & INITIALS */}
-            {displayedTeamObj ? (
-              <div className={`p-4 sm:p-5 rounded-2xl border-2 flex flex-col sm:flex-row items-center justify-between transition-all duration-300 gap-4 ${
-                isSoldOut 
-                  ? 'bg-rose-500/15 border-rose-500 text-rose-100 shadow-[0_0_25px_rgba(244,63,94,0.2)]'
-                  : 'bg-cyan-500/15 border-cyan-400 text-cyan-100 shadow-[0_0_25px_rgba(0,242,254,0.25)]'
-              }`}>
-                {/* Team Info */}
-                <div className="flex items-center space-x-3.5">
-                  <span className="text-4xl sm:text-5xl">{displayedTeamObj.logo}</span>
-                  <div>
-                    <span className={`text-xs uppercase font-extrabold block tracking-wider ${isSoldOut ? 'text-rose-300' : 'text-cyan-300'}`}>
-                      {isSoldOut ? 'ACQUIRED BY TEAM' : 'CURRENT HIGHEST BIDDER'}
-                    </span>
-                    <span className="text-xl sm:text-2xl font-black text-white">{displayedTeamObj.name}</span>
-                  </div>
-                </div>
-
-                {/* Team Captain Spotlight */}
+            {/* Leading Team Display */}
+            {leadingTeamObj ? (
+              <div 
+                className="p-3 rounded-2xl border transition-all duration-300 flex items-center justify-between"
+                style={{
+                  backgroundColor: `${leadingTeamObj.color || '#00f2fe'}15`,
+                  borderColor: `${leadingTeamObj.color || '#00f2fe'}50`,
+                }}
+              >
                 {(() => {
-                  const cap = getCaptainInfo(displayedTeamObj);
-                  if (!cap) return null;
+                  const cap = getCaptainInfo(leadingTeamObj);
                   return (
-                    <div className="flex items-center space-x-3 bg-slate-950/80 px-3.5 py-2 rounded-2xl border border-amber-500/40 shadow-lg">
-                      <div className="relative shrink-0">
-                        <img
-                          src={cap.avatarUrl}
-                          alt={cap.name}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-amber-400 shadow-md"
-                          onError={(e) => {
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cap.name)}&background=0f172a&color=f59e0b&bold=true`;
-                          }}
-                        />
-                        <span className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
-                          👑
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {isSoldOut ? 'Sold To Franchise' : 'Leading High Bidder'}
                         </span>
-                      </div>
-                      <div className="text-left">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] uppercase font-extrabold text-amber-400 tracking-wider">CAPTAIN</span>
-                          <span className="text-[10px] font-black font-mono bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">
-                            {cap.initials}
-                          </span>
-                        </div>
-                        <span className="text-xs sm:text-sm font-bold text-white block truncate max-w-[130px] sm:max-w-[160px]">{cap.name}</span>
+                        <h4 className="text-base sm:text-lg font-black text-white font-sans">
+                          {leadingTeamObj.name}
+                        </h4>
                       </div>
                     </div>
                   );
@@ -618,46 +662,52 @@ export default function ProjectorView({
                 )}
               </div>
             ) : (
-              <div className="p-4 text-center rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 text-slate-500 text-sm">
-                Waiting for opening bid...
+              <div className="p-3 text-center rounded-xl bg-slate-900/60 border border-dashed border-slate-800 text-slate-500 text-xs font-mono">
+                Waiting for opening bid from teams below…
               </div>
             )}
 
             {/* Dynamic Bidding Tier Indicator */}
             {!isSoldOut && (
-              <div className="px-4 py-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 flex items-center justify-between text-xs font-mono shadow-md">
+              <div className="px-3.5 py-2 rounded-xl bg-slate-900/80 border border-cyan-500/30 flex items-center justify-between text-xs font-mono shadow-sm">
                 <div className="flex items-center space-x-2 text-cyan-300">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f2fe]" />
-                  <span className="font-bold uppercase tracking-wider text-[11px]">
-                    {getBidSlabInfo(currentBid).label} · {getBidSlabInfo(currentBid).rangeText}
+                  <span className="font-bold uppercase tracking-wider text-[10px]">
+                    {getBidSlabInfo(currentBid).label} ({getBidSlabInfo(currentBid).rangeText})
                   </span>
                 </div>
                 <span className="text-emerald-400 font-extrabold text-xs">
-                  Slab Step: +₹{getBidIncrement(currentBid)} PTS
+                  Min Step: +₹{getBidIncrement(currentBid)} PTS
                 </span>
               </div>
             )}
 
-            {/* Team Bidding Control Suite with CAPTAIN PHOTO & INITIALS */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+            {/* Team Bidding Control Suite */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
               {teams.map((t) => {
                 const isCurrentLeading = activePlayer?.leadingTeam === t.id;
                 const isDisabled = isSoldOut || !canBid || isCurrentLeading;
                 const currentInc = getBidIncrement(currentBid);
-                const cap = getCaptainInfo(t);
 
                 return (
                   <button
                     key={t.id}
                     disabled={isDisabled}
                     onClick={() => handleQuickBid(t, currentInc)}
-                    className={`p-3 pl-4 rounded-2xl text-left transition border relative overflow-hidden ${
+                    className={`p-2.5 pl-3 rounded-xl text-left transition border relative overflow-hidden ${
                       isDisabled
-                        ? 'bg-slate-950/50 border-slate-850 opacity-40 cursor-not-allowed'
+                        ? 'bg-slate-950/50 border-slate-800 opacity-40 cursor-not-allowed'
                         : isCurrentLeading
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/50 scale-[1.02]'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/50 scale-[1.01]'
                           : 'bg-slate-900/90 hover:bg-slate-800 border-slate-800 text-white active:scale-95 cursor-pointer'
                     }`}
+                    style={{
+                      boxShadow: isCurrentLeading
+                        ? `0 0 25px ${t.color || '#00f2fe'}40, 0 4px 15px ${t.color || '#00f2fe'}25`
+                        : !isDisabled
+                          ? `0 6px 20px -4px ${t.color || '#00f2fe'}20`
+                          : undefined
+                    }}
                   >
                     {/* Vertical Team Color Ribbon Accent */}
                     <div 
@@ -669,59 +719,89 @@ export default function ProjectorView({
                     />
                     
                     <div className="flex items-center justify-between">
-                      <div className="text-xl mb-0.5">{t.logo}</div>
+                      <span className="font-extrabold text-white text-xs block truncate font-sans">{t.shortName || t.name}</span>
                       <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                        {isSoldOut ? 'SOLD' : `+${currentInc} PTS`}
+                        {isSoldOut ? 'SOLD' : `+${currentInc}`}
                       </span>
                     </div>
                     
-                    <span className="font-bold text-white text-xs block truncate">{t.shortName}</span>
-                    
-                    {/* Captain Thumbnail & Initials Badge */}
-                    {cap && (
-                      <div className="flex items-center space-x-1.5 mt-1 pt-1 border-t border-slate-800/80">
-                        <img
-                          src={cap.avatarUrl}
-                          alt={cap.name}
-                          className="w-4 h-4 rounded-full object-cover border border-amber-400/80 shrink-0"
-                          onError={(e) => {
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cap.name)}&background=0f172a&color=f59e0b&bold=true`;
-                          }}
-                        />
-                        <span className="text-[10px] text-amber-300/90 font-bold truncate flex items-center gap-1">
-                          <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 rounded font-mono font-black">{cap.initials}</span>
-                          <span className="truncate">{cap.name}</span>
-                        </span>
-                      </div>
-                    )}
+                    <span className="text-[10px] text-slate-400 block truncate font-mono mt-0.5">
+                      Purse: ₹{t.totalPurse - t.spentPurse}
+                    </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Hammer Sold Button or Sold Out Banner */}
+            {/* Hammer Auction Management Bar */}
             {isSoldOut ? (
-              <div className="w-full py-4 rounded-2xl font-black text-lg uppercase tracking-widest bg-rose-950/60 text-rose-300 border border-rose-500/40 flex items-center justify-center space-x-2 text-center shadow-lg">
-                <CheckCircle2 className="w-6 h-6 text-rose-400" />
-                <span>PLAYER SOLD OUT TO {buyerTeamObj?.name || 'TEAM'}</span>
+              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/40 shadow-lg">
+                <div className="flex items-center space-x-2 text-rose-300 font-bold text-sm sm:text-base">
+                  <CheckCircle2 className="w-6 h-6 text-rose-400 shrink-0" />
+                  <span>Sold Out to {buyerTeamObj?.name || 'Team'} (₹{activePlayer.soldPrice || currentBid} PTS)</span>
+                </div>
+                {canSell && (
+                  <button
+                    onClick={() => {
+                      if (!window.confirm(`Reopen auction for "${activePlayer.name}" and return to available pool?`)) return;
+                      const updated = { ...activePlayer, status: 'available', soldPrice: null, soldTo: null, leadingTeam: null, currentBid: activePlayer.basePrice };
+                      setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+                      apiUpdatePlayer(activePlayer.id, updated).catch(console.warn);
+                      if (buyerTeamObj) {
+                        const newSquad = (buyerTeamObj.squad || []).filter(p => p.id !== activePlayer.id);
+                        const newTeam = { ...buyerTeamObj, spentPurse: Math.max(0, buyerTeamObj.spentPurse - (activePlayer.soldPrice || currentBid)), squad: newSquad, playersCount: newSquad.length };
+                        setTeams(prev => prev.map(t => t.id === buyerTeamObj.id ? newTeam : t));
+                        apiUpdateTeam(buyerTeamObj.id, newTeam).catch(console.warn);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-mono font-bold border border-slate-700 transition cursor-pointer"
+                  >
+                    ↺ Reopen Auction
+                  </button>
+                )}
               </div>
             ) : canSell ? (
-              <button
-                onClick={handleSold}
-                disabled={isProcessing || !leadingTeamObj}
-                className={`w-full py-5 rounded-2xl font-black text-xl uppercase tracking-widest transition flex items-center justify-center space-x-3 shadow-2xl cursor-pointer ${
-                  leadingTeamObj
-                    ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 hover:scale-[1.02] shadow-[0_0_30px_rgba(0,242,254,0.45)]'
-                    : 'bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800'
-                }`}
-              >
-                <Gavel className="w-7 h-7 transform -rotate-45 text-slate-950" />
-                <span>HAMMER SOLD (₹{currentBid} PTS)</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleMarkUnsold}
+                  disabled={isProcessing}
+                  className="flex items-center justify-center space-x-2 px-5 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-bold text-sm border border-slate-700 transition cursor-pointer shrink-0 shadow-md"
+                  title="Pass player / Mark as Unsold"
+                >
+                  <XCircle className="w-5 h-5 text-slate-400" />
+                  <span className="hidden sm:inline">Pass / Unsold</span>
+                </button>
+
+                {leadingTeamObj && (
+                  <button
+                    onClick={handleRevokeBid}
+                    disabled={isProcessing}
+                    className="flex items-center justify-center space-x-1.5 px-4 py-4 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs border border-rose-500/40 transition cursor-pointer shrink-0 shadow-md"
+                    title="Revoke current high bid and reset to base price"
+                  >
+                    <RotateCcw className="w-4 h-4 text-rose-400" />
+                    <span className="hidden sm:inline">Revoke Bid</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleSold}
+                  disabled={isProcessing || !leadingTeamObj}
+                  className={`flex-1 py-4 sm:py-5 px-6 rounded-2xl font-black text-lg sm:text-xl uppercase tracking-wider transition flex items-center justify-center space-x-3 shadow-2xl cursor-pointer ${
+                    leadingTeamObj
+                      ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 hover:scale-[1.02] shadow-[0_0_30px_rgba(0,242,254,0.45)] active:scale-95'
+                      : 'bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800'
+                  }`}
+                  title={leadingTeamObj ? `Hammer Sold to ${leadingTeamObj.name} for ₹${currentBid} PTS` : 'Place a bid with any team first'}
+                >
+                  <Gavel className="w-6 h-6 sm:w-7 sm:h-7 transform -rotate-45 text-slate-950" />
+                  <span>Hammer Sold (₹{currentBid} PTS)</span>
+                </button>
+              </div>
             ) : (
               <div className="w-full py-4 rounded-2xl font-bold text-sm bg-slate-900/90 text-slate-400 border border-slate-800 flex items-center justify-center space-x-2">
                 <Lock className="w-5 h-5 text-amber-400" />
-                <span>SUPER ADMIN ONLY (HAMMER SOLD)</span>
+                <span>Super Admin / Auctioneer Only (Hammer Sold)</span>
               </div>
             )}
 
@@ -736,7 +816,7 @@ export default function ProjectorView({
       )}
 
       {/* ── Franchise Captains Showcase Footer Bar ── */}
-      <div className="z-10 border-t border-slate-800/80 pt-3">
+      <div className="z-10 border-t border-slate-800/80 pt-3 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">

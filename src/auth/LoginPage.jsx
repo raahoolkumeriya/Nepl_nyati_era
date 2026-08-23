@@ -47,34 +47,34 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10">
 
         {/* Brand Header */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-neon-violet p-[2px] shadow-[0_0_30px_rgba(0,242,254,0.4)] mb-5">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-neon-violet p-[2px] shadow-[0_0_30px_rgba(0,242,254,0.4)] mb-4">
             <div className="w-full h-full bg-[#070b14] rounded-[14px] flex items-center justify-center">
               <Gavel className="w-8 h-8 text-cyan-400 transform -rotate-45" />
             </div>
           </div>
-          <h1 className="text-4xl font-display font-black text-slate-100 tracking-wider uppercase">
-            NYATI <span className="gradient-text-brand">ERA</span>
+          <h1 className="text-3xl sm:text-4xl font-sans font-extrabold text-slate-100 tracking-tight">
+            Nyati <span className="gradient-text-brand">Era</span>
           </h1>
-          <p className="text-cyan-400/80 text-xs mt-1 font-mono tracking-widest uppercase font-semibold">
-            Box Cricket Premier League
+          <p className="text-cyan-400/90 text-xs sm:text-sm mt-1 font-sans font-bold tracking-wide">
+            Box Cricket Premier League 2026
           </p>
-          <div className="mt-3.5 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,242,254,0.2)]">
+          <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,242,254,0.2)]">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
-            <span className="text-xs text-cyan-300 font-display font-bold">Live Auction Platform</span>
+            <span className="text-xs sm:text-sm text-cyan-300 font-sans font-extrabold">Live Auction Platform</span>
           </div>
         </div>
 
         {/* Login Card */}
-        <div className={`warm-card rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-cyan-500/25 transition-all duration-200 ${shake ? 'animate-shake' : ''}`}>
+        <div className={`warm-card rounded-3xl p-6 sm:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-cyan-500/25 transition-all duration-200 font-sans ${shake ? 'animate-shake' : ''}`}>
           <div className="mb-6">
-            <h2 className="text-xl font-display font-bold text-slate-100">Portal Authentication</h2>
-            <p className="text-slate-400 text-xs mt-1">Sign in with your credentials to access live bidding</p>
+            <h2 className="text-lg sm:text-xl font-sans font-extrabold text-slate-100">Portal Authentication</h2>
+            <p className="text-slate-400 text-xs sm:text-sm font-sans mt-1">Sign in with your credentials to access live bidding</p>
           </div>
 
           {/* Error message */}
           {error && (
-            <div className="flex items-center gap-2.5 bg-rose-950/60 border border-rose-500/40 rounded-xl px-4 py-3 mb-5 text-xs text-rose-300">
+            <div className="flex items-center gap-2.5 bg-rose-950/60 border border-rose-500/40 rounded-xl px-4 py-3 mb-5 text-xs text-rose-300 font-sans font-bold">
               <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
@@ -83,8 +83,8 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-display">
-                Email address
+              <label className="block text-xs sm:text-sm font-extrabold text-slate-300 mb-2 font-sans">
+                Email Address
               </label>
               <input
                 type="email"
@@ -93,13 +93,13 @@ export default function LoginPage() {
                 placeholder="your@email.com"
                 required
                 autoFocus
-                className="cyber-input"
+                className="cyber-input font-sans text-sm"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-display">
+              <label className="block text-xs sm:text-sm font-extrabold text-slate-300 mb-2 font-sans">
                 Password
               </label>
               <div className="relative">
@@ -109,7 +109,7 @@ export default function LoginPage() {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="cyber-input pr-12"
+                  className="cyber-input pr-12 font-sans text-sm"
                 />
                 <button
                   type="button"
@@ -125,7 +125,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 font-display font-bold text-sm tracking-wide transition-all duration-200 shadow-[0_0_20px_rgba(0,242,254,0.4)] hover:shadow-[0_0_30px_rgba(0,242,254,0.7)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-3 cursor-pointer"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 font-sans font-extrabold text-sm sm:text-base tracking-tight transition-all duration-200 shadow-[0_0_20px_rgba(0,242,254,0.4)] hover:shadow-[0_0_30px_rgba(0,242,254,0.7)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-3 cursor-pointer"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -141,41 +141,41 @@ export default function LoginPage() {
 
           {/* Quick Account Selection */}
           <div className="mt-6 pt-5 border-t border-cyan-500/15">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5 font-display flex items-center justify-between">
+            <p className="text-xs font-extrabold text-slate-300 mb-2.5 font-sans flex items-center justify-between">
               <span>Select Account</span>
-              <span className="text-[10px] text-cyan-400/80 font-normal">Click to fill email</span>
+              <span className="text-[10px] text-cyan-400 font-normal">Click to autofill</span>
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => { setEmail('admin@nepl.in'); setError(''); }}
-                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/40 transition group cursor-pointer"
+                className="text-left p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/40 transition group cursor-pointer"
               >
-                <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300">⚡ Super Admin</div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-200 group-hover:text-cyan-300 font-sans">⚡ Super Admin</div>
                 <div className="text-[10px] text-slate-500 font-mono truncate">admin@nepl.in</div>
               </button>
               <button
                 type="button"
                 onClick={() => { setEmail('auction@nepl.in'); setError(''); }}
-                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-amber-500/40 transition group cursor-pointer"
+                className="text-left p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-amber-500/40 transition group cursor-pointer"
               >
-                <div className="text-xs font-bold text-slate-200 group-hover:text-amber-300">🔨 Auctioneer</div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-200 group-hover:text-amber-300 font-sans">🔨 Auctioneer</div>
                 <div className="text-[10px] text-slate-500 font-mono truncate">auction@nepl.in</div>
               </button>
               <button
                 type="button"
                 onClick={() => { setEmail('player@nepl.in'); setError(''); }}
-                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-emerald-500/40 transition group cursor-pointer"
+                className="text-left p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-emerald-500/40 transition group cursor-pointer"
               >
-                <div className="text-xs font-bold text-slate-200 group-hover:text-emerald-300">🏏 Player</div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-200 group-hover:text-emerald-300 font-sans">🏏 Player</div>
                 <div className="text-[10px] text-slate-500 font-mono truncate">player@nepl.in</div>
               </button>
               <button
                 type="button"
                 onClick={() => { setEmail('developer@nepl.in'); setError(''); }}
-                className="text-left p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-purple-500/40 transition group cursor-pointer"
+                className="text-left p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-purple-500/40 transition group cursor-pointer"
               >
-                <div className="text-xs font-bold text-slate-200 group-hover:text-purple-300">👑 Dev Master</div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-200 group-hover:text-purple-300 font-sans">👑 Dev Master</div>
                 <div className="text-[10px] text-slate-500 font-mono truncate">developer@nepl.in</div>
               </button>
             </div>
@@ -183,8 +183,8 @@ export default function LoginPage() {
         </div>
 
         {/* Footer note & Copyright */}
-        <div className="text-center mt-8 space-y-1.5">
-          <p className="text-xs text-slate-400 font-medium">
+        <div className="text-center mt-8 space-y-1.5 font-sans">
+          <p className="text-xs sm:text-sm text-slate-400 font-bold">
             © 2026 onwards Box Cricket Premier League NEPL
           </p>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 text-xs font-serif shadow-[0_0_10px_rgba(121,40,202,0.15)]">

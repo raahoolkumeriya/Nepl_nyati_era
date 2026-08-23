@@ -8,7 +8,9 @@ import playersRouter from './routes/players.js';
 import teamsRouter from './routes/teams.js';
 import historyRouter from './routes/history.js';
 import rulesRouter from './routes/rules.js';
+import matchesRouter from './routes/matches.js';
 import authRouter from './routes/auth.js';
+import geminiRouter from './routes/gemini.js';
 import Rule from './models/Rule.js';
 import { DEFAULT_RULES } from './data/defaultRules.js';
 import { serveSwaggerUi, setupSwaggerUi, openApiSpec } from './swagger.js';
@@ -40,6 +42,8 @@ app.use('/api/players', playersRouter);
 app.use('/api/teams', teamsRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/rules', rulesRouter);
+app.use('/api/matches', matchesRouter);
+app.use('/api/gemini', geminiRouter);
 
 // ── Interactive API Documentation (OpenAPI 3.0 / Swagger UI & Redoc) ─────────
 app.use('/api/docs', serveSwaggerUi, setupSwaggerUi);

@@ -37,6 +37,7 @@ export default function PlayersPool({
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [tournamentFilter, setTournamentFilter] = useState('All'); // 'All' | 'playing' | 'reserve' | 'new_joiner'
   const [showAddModal, setShowAddModal] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [photoInfo, setPhotoInfo] = useState('');
@@ -55,7 +56,10 @@ export default function PlayersPool({
     economy: 7.0,
     bestBowling: '2/15',
     cricHeroesUrl: 'https://cricheroes.com',
-    avatarUrl: '/avatars/male.png'
+    avatarUrl: '/avatars/male.png',
+    isPlayingNEPL: true,
+    isNewJoiner: true,
+    tournamentSession: 'NEPL 2026'
   });
 
   // Super Admin Edit Player State
@@ -70,13 +74,17 @@ export default function PlayersPool({
     grantAuctioneerAccess: false,
     auctioneerEmail: '',
     auctioneerPassword: (import.meta.env.VITE_AUCTIONEER_PASS || '').trim(),
+    isPlayingNEPL: true,
+    isNewJoiner: false,
+    tournamentSession: 'NEPL 2026'
   });
 
   const defaultAuctioneerPass = (import.meta.env.VITE_AUCTIONEER_PASS || '').trim();
 
   const openEditPlayerModal = (player) => {
     setEditingPlayer(player);
-    const assignedTeamId = player.captainOfTeamId || (player.isCaptain ? player.soldTo : '');
+    const captainTeam = teams.find(t => t.captainId === player.id || t.squad?.some(s => s.id === player.id && s.isCaptain));
+    const assignedTeamId = player.captainOfTeamId || (captainTeam ? captainTeam.id : (player.isCaptain && player.soldTo ? player.soldTo : ''));
     const cleanName = player.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.');
     setEditFormData({
       name: player.name,
@@ -88,7 +96,23 @@ export default function PlayersPool({
       grantAuctioneerAccess: Boolean(player.isAuctioneer),
       auctioneerEmail: `${cleanName}@nepl.in`,
       auctioneerPassword: defaultAuctioneerPass,
+      isPlayingNEPL: player.isPlayingNEPL !== false,
+      isNewJoiner: Boolean(player.isNewJoiner),
+      tournamentSession: player.tournamentSession || 'NEPL 2026'
     });
+  };
+
+  const handleTogglePlayingNEPL = (player) => {
+    if (!canEdit && !can('canManageTeams') && !can('canManageUsers')) {
+      alert("Only Admins and Managers can toggle tournament playing status.");
+      return;
+    }
+
+    const nextState = player.isPlayingNEPL === false ? true : false;
+    const updated = { ...player, isPlayingNEPL: nextState };
+    
+    setPlayers(prev => prev.map(p => p.id === player.id ? updated : p));
+    apiUpdatePlayer(player.id, updated).catch(console.warn);
   };
 
   const handleQuickGrantAuctioneer = (player) => {
@@ -146,7 +170,8 @@ export default function PlayersPool({
 
     const selectedTeamId = editFormData.captainOfTeamId;
     const isNowCaptain = Boolean(selectedTeamId);
-    const prevTeamId = editingPlayer.captainOfTeamId || (editingPlayer.isCaptain ? editingPlayer.soldTo : null);
+    const prevCaptainTeam = teams.find(t => t.captainId === editingPlayer.id || t.squad?.some(s => s.id === editingPlayer.id && s.isCaptain));
+    const prevTeamId = editingPlayer.captainOfTeamId || (prevCaptainTeam ? prevCaptainTeam.id : (editingPlayer.isCaptain ? editingPlayer.soldTo : null));
 
     const isNowAuctioneer = editFormData.grantAuctioneerAccess || isNowCaptain;
 
@@ -160,9 +185,12 @@ export default function PlayersPool({
       isCaptain: isNowCaptain,
       isAuctioneer: isNowAuctioneer,
       captainOfTeamId: selectedTeamId || null,
-      status: isNowCaptain ? 'sold' : (editingPlayer.status === 'sold' && prevTeamId ? 'available' : editingPlayer.status),
-      soldPrice: isNowCaptain ? 0 : (editingPlayer.soldPrice === 0 && prevTeamId ? 0 : editingPlayer.soldPrice),
-      soldTo: isNowCaptain ? selectedTeamId : (editingPlayer.soldTo === prevTeamId ? null : editingPlayer.soldTo),
+      status: isNowCaptain ? 'sold' : (editingPlayer.soldTo ? 'sold' : 'available'),
+      soldPrice: isNowCaptain ? 0 : (editingPlayer.soldPrice || 0),
+      soldTo: isNowCaptain ? selectedTeamId : (prevTeamId && !selectedTeamId ? (editingPlayer.soldTo === prevTeamId ? editingPlayer.soldTo : null) : editingPlayer.soldTo),
+      isPlayingNEPL: Boolean(editFormData.isPlayingNEPL),
+      isNewJoiner: Boolean(editFormData.isNewJoiner),
+      tournamentSession: editFormData.tournamentSession || 'NEPL 2026'
     };
 
     const cleanName = editFormData.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.');
@@ -203,6 +231,19 @@ export default function PlayersPool({
     // Synchronize team squad with 0 credit
     if (setTeams && (isNowCaptain || prevTeamId)) {
       setTeams(prevTeams => prevTeams.map(t => {
+        // If captaincy was removed for this team
+        if (prevTeamId && t.id === prevTeamId && !selectedTeamId) {
+          const newSquad = (t.squad || []).map(p => p.id === editingPlayer.id ? { ...p, isCaptain: false, captainOfTeamId: null } : p);
+          const updated = {
+            ...t,
+            squad: newSquad,
+            captainId: t.captainId === editingPlayer.id ? null : t.captainId,
+            captainName: t.captainId === editingPlayer.id ? null : t.captainName,
+          };
+          apiUpdatePlayer(t.id, updated).catch(console.warn);
+          return updated;
+        }
+
         // 1. Remove from previous team if changed
         if (prevTeamId && t.id === prevTeamId && prevTeamId !== selectedTeamId) {
           const newSquad = (t.squad || []).filter(p => p.id !== editingPlayer.id);
@@ -229,6 +270,7 @@ export default function PlayersPool({
             avatarUrl: editingPlayer.avatarUrl,
             cricHeroesUrl: updatedPlayer.cricHeroesUrl,
             isCaptain: true,
+            captainOfTeamId: selectedTeamId,
             isAuctioneer: true,
           };
           const newSquad = [squadEntry, ...filteredSquad];
@@ -260,12 +302,25 @@ export default function PlayersPool({
 
     let matchesStatus = true;
     if (statusFilter === 'captains') {
-      matchesStatus = Boolean(p.isCaptain || p.captainOfTeamId || (p.status === 'sold' && p.soldPrice === 0 && p.soldTo));
+      matchesStatus = Boolean(
+        p.isCaptain === true || 
+        p.captainOfTeamId || 
+        teams.some(t => t.captainId === p.id || t.squad?.some(s => s.id === p.id && s.isCaptain))
+      );
     } else if (statusFilter !== 'All') {
       matchesStatus = p.status === statusFilter;
     }
 
-    return matchesSearch && matchesRole && matchesStatus && matchesCat;
+    let matchesTournament = true;
+    if (tournamentFilter === 'playing') {
+      matchesTournament = p.isPlayingNEPL !== false;
+    } else if (tournamentFilter === 'reserve') {
+      matchesTournament = p.isPlayingNEPL === false;
+    } else if (tournamentFilter === 'new_joiner') {
+      matchesTournament = Boolean(p.isNewJoiner);
+    }
+
+    return matchesSearch && matchesRole && matchesStatus && matchesCat && matchesTournament;
   });
 
   const handlePhotoUpload = async (e, isNew = true, targetPlayerId = null) => {
@@ -312,9 +367,13 @@ export default function PlayersPool({
       wickets: Math.max(0, Number(newPlayer.wickets) || 0),
       status: 'available',
       soldPrice: 0,
-      soldTo: null
+      soldTo: null,
+      isPlayingNEPL: Boolean(newPlayer.isPlayingNEPL),
+      isNewJoiner: Boolean(newPlayer.isNewJoiner),
+      tournamentSession: newPlayer.tournamentSession || 'NEPL 2026'
     };
     setPlayers(prev => [createdPlayer, ...prev]);
+    apiUpdatePlayer(createdPlayer.id, createdPlayer).catch(console.warn);
     setShowAddModal(false);
     setPhotoInfo('');
     setNewPlayer({
@@ -330,7 +389,10 @@ export default function PlayersPool({
       economy: 7.0,
       bestBowling: '2/15',
       cricHeroesUrl: 'https://cricheroes.com',
-      avatarUrl: '/avatars/male.png'
+      avatarUrl: '/avatars/male.png',
+      isPlayingNEPL: true,
+      isNewJoiner: true,
+      tournamentSession: 'NEPL 2026'
     });
   };
 
@@ -366,11 +428,11 @@ export default function PlayersPool({
       <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-warm-700/50 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-xs font-black uppercase tracking-wider border border-cyan-500/30 mb-3">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-xs font-bold tracking-normal border border-cyan-500/30 mb-3">
               <Award className="w-3.5 h-3.5" />
-              SQUAD DIRECTORY ({players.length} PLAYERS)
+              <span>Squad Directory ({players.length} Players)</span>
             </div>
-            <h2 className="text-3xl font-black text-sand-100 tracking-tight font-display">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-sand-100 tracking-tight font-sans">
               NEPL Players Pool & Roster
             </h2>
             <p className="text-sand-400 text-xs mt-2 max-w-xl">
@@ -381,7 +443,7 @@ export default function PlayersPool({
           {canAdd && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="btn-primary shrink-0 font-display font-bold uppercase tracking-wider text-xs px-5 py-3"
+              className="btn-primary shrink-0 font-sans font-bold uppercase tracking-wider text-xs px-5 py-3"
             >
               <UserPlus className="w-4 h-4" />
               <span>Add New Player</span>
@@ -392,6 +454,31 @@ export default function PlayersPool({
 
       {/* Filter Bar */}
       <div className="glass-panel p-4 rounded-2xl border border-warm-700/50 space-y-3">
+        {/* Tournament Roster & Playing Status Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-warm-800/60">
+          {[
+            { id: 'All', label: 'All Players', count: players.length, color: 'text-slate-300' },
+            { id: 'playing', label: '🏏 Playing NEPL (Active)', count: players.filter(p => p.isPlayingNEPL !== false).length, color: 'text-emerald-400' },
+            { id: 'reserve', label: '⏳ Next Session / Reserve', count: players.filter(p => p.isPlayingNEPL === false).length, color: 'text-amber-400' },
+            { id: 'new_joiner', label: '✨ New Joiners', count: players.filter(p => p.isNewJoiner).length, color: 'text-cyan-300' },
+          ].map(pill => (
+            <button
+              key={pill.id}
+              onClick={() => setTournamentFilter(pill.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs transition cursor-pointer ${
+                tournamentFilter === pill.id
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold shadow-[0_0_12px_rgba(0,242,254,0.3)]'
+                  : 'bg-warm-900/80 text-slate-400 border border-warm-700/60 hover:text-slate-200'
+              }`}
+            >
+              <span>{pill.label}</span>
+              <span className={`px-1.5 py-0.2 rounded-md bg-warm-950 font-black text-[10px] ${pill.color}`}>
+                {pill.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-sand-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -467,10 +554,16 @@ export default function PlayersPool({
       )}
 
       {/* ── Player Cards Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-5">
         {filteredPlayers.map(player => {
-          const isCap = Boolean(player.isCaptain || player.captainOfTeamId || (player.soldPrice === 0 && player.status === 'sold' && player.soldTo));
+          const isCap = Boolean(
+            player.isCaptain === true || 
+            player.captainOfTeamId || 
+            teams.some(t => t.captainId === player.id || t.squad?.some(s => s.id === player.id && s.isCaptain))
+          );
           const isAuctioneer = Boolean(player.isAuctioneer);
+          const isPlaying = player.isPlayingNEPL !== false;
+          const isNewJoiner = Boolean(player.isNewJoiner);
           const buyerTeam = teams.find(t => t.id === player.soldTo || t.id === player.captainOfTeamId);
           return (
             <div
@@ -488,102 +581,124 @@ export default function PlayersPool({
 
               {/* Avatar + Name */}
               <div>
-                {/* 👑 Captain & Auctioneer Header Tag if applicable */}
-                {(isCap || isAuctioneer) && (
-                  <div className="mb-2.5 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider">
-                      {isCap ? <Crown className="w-3 h-3 text-amber-400" /> : <Zap className="w-2.5 h-2.5 text-cyan-300" />}
-                      {isCap ? 'Captain & Auctioneer' : 'Authorized Auctioneer'}
-                    </span>
-                    {buyerTeam && (
-                      <span className="text-[10px] font-bold text-amber-400 font-mono">
-                        {buyerTeam.shortName}
+                {/* 👑 Playing Status, Captain Tags & Admin Controls */}
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-warm-800/40 pb-2">
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    {/* Quick Toggle Playing Status Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePlayingNEPL(player)}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase transition cursor-pointer ${
+                        isPlaying
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                      }`}
+                      title={canEdit || can('canManageTeams') ? "Click to toggle: Playing in NEPL vs Next Session/Reserve" : "Tournament status"}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                      <span>{isPlaying ? '🏏 Playing' : '⏳ Reserve'}</span>
+                    </button>
+
+                    {isNewJoiner && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[9px] font-mono font-bold">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>New</span>
+                      </span>
+                    )}
+
+                    {(isCap || isAuctioneer) && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-black uppercase">
+                        {isCap ? <Crown className="w-2.5 h-2.5 text-amber-400" /> : <Zap className="w-2 h-2 text-cyan-300" />}
+                        {isCap ? 'Captain' : 'Auctioneer'}
                       </span>
                     )}
                   </div>
-                )}
 
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="relative group/avatar shrink-0">
-                      <img
-                        src={player.avatarUrl}
-                        alt={player.name}
-                        className={`w-14 h-14 rounded-xl object-cover border-2 bg-warm-900 shadow-md ${
-                          isCap ? 'border-amber-400 ring-2 ring-amber-400/30' : isAuctioneer ? 'border-cyan-400' : 'border-warm-700'
-                        }`}
-                        onError={e => { e.target.src = '/avatars/male.png'; }}
-                      />
-                      {isCap && (
-                        <span className="absolute -top-1 -right-1 p-1 bg-amber-400 text-slate-950 rounded-full shadow-md z-10">
-                          <Crown className="w-3 h-3" />
-                        </span>
-                      )}
-                      {/* Photo Update Overlay */}
-                      <label 
-                        className="absolute inset-0 rounded-xl bg-slate-950/75 opacity-0 group-hover/avatar:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-200"
-                        title="Upload compressed photo"
-                      >
-                        <Camera className="w-4 h-4 text-cyan-300" />
-                        <span className="text-[8px] font-bold text-cyan-200 uppercase tracking-tighter">Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handlePhotoUpload(e, false, player.id)}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center space-x-1.5">
-                        <h3 className="font-bold text-sand-100 text-sm truncate font-display flex items-center gap-1">
-                          {player.name}
-                        </h3>
-                        {player.cricHeroesUrl && (
-                          <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300 flex-shrink-0">
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-                      </div>
-                      <span className="text-[11px] text-cyan-300 font-semibold">{player.role}</span>
-                      <span className="block text-[10px] text-amber-400 font-mono">{player.category}</span>
-                    </div>
-                  </div>
-
-                  {/* Super Admin Edit, Promote & Delete Player Buttons */}
-                  <div className="flex items-center space-x-1 shrink-0 ml-1">
+                  {/* Super Admin Action Controls */}
+                  <div className="flex items-center space-x-1 shrink-0">
                     {can('canManageUsers') && (
                       <button
                         onClick={() => handleQuickGrantAuctioneer(player)}
-                        className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        className={`p-1 rounded-lg border transition cursor-pointer ${
                           player.isAuctioneer
                             ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
                             : 'bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border-warm-700/60 hover:border-amber-500/40'
                         }`}
                         title={player.isAuctioneer ? `⚡ Auctioneer access active for ${player.name}` : `⚡ Grant Auctioneer Console Login to ${player.name}`}
                       >
-                        <Zap className={`w-3.5 h-3.5 ${player.isAuctioneer ? 'text-amber-400 fill-amber-400' : ''}`} />
+                        <Zap className={`w-3 h-3 ${player.isAuctioneer ? 'text-amber-400 fill-amber-400' : ''}`} />
                       </button>
                     )}
                     {canEdit && (
                       <button
                         onClick={() => openEditPlayerModal(player)}
-                        className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border border-warm-700/60 hover:border-amber-500/40 transition cursor-pointer"
+                        className="p-1 rounded-lg bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border border-warm-700/60 hover:border-amber-500/40 transition cursor-pointer"
                         title={`Edit ${player.name} & Roles`}
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Edit3 className="w-3 h-3" />
                       </button>
                     )}
                     {canDelete && (
                       <button
                         onClick={() => handleDeletePlayer(player)}
-                        className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition cursor-pointer"
+                        className="p-1 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition cursor-pointer"
                         title={`Delete ${player.name}`}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3.5">
+                  <div className="relative group/avatar shrink-0">
+                    <div className={`w-20 h-20 sm:w-22 sm:h-22 rounded-2xl overflow-hidden border-2 bg-warm-900 shadow-lg ${
+                      isCap ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-amber-400/20' : isAuctioneer ? 'border-cyan-400 shadow-cyan-400/20' : 'border-warm-700'
+                    }`}>
+                      <img
+                        src={player.avatarUrl}
+                        alt={player.name}
+                        className="w-full h-full object-cover object-[center_15%] scale-110 group-hover/avatar:scale-115 transition duration-300"
+                        onError={e => { e.target.src = '/avatars/male.png'; }}
+                      />
+                    </div>
+                    {isCap && (
+                      <span className="absolute -top-1.5 -right-1.5 p-1 bg-amber-400 text-slate-950 rounded-full shadow-lg z-10">
+                        <Crown className="w-3.5 h-3.5" />
+                      </span>
+                    )}
+                    {/* Photo Update Overlay */}
+                    <label 
+                      className="absolute inset-0 rounded-2xl bg-slate-950/75 opacity-0 group-hover/avatar:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-200"
+                      title="Upload compressed photo"
+                    >
+                      <Camera className="w-5 h-5 text-cyan-300" />
+                      <span className="text-[9px] font-bold text-cyan-200 uppercase tracking-tight mt-0.5">Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handlePhotoUpload(e, false, player.id)}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="font-extrabold text-sand-100 text-base sm:text-lg leading-tight font-sans break-words" title={player.name}>
+                      <span className="inline-flex items-center gap-1.5 flex-wrap">
+                        <span>{player.name}</span>
+                        {player.cricHeroesUrl && (
+                          <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300 inline-flex items-center shrink-0 p-0.5 rounded hover:bg-amber-400/10 transition" title="Open CricHeroes Profile">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </span>
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-xs text-cyan-300 font-bold tracking-wide">{player.role}</span>
+                      <span className="text-sand-600 text-xs font-mono">•</span>
+                      <span className="text-[11px] text-amber-400 font-mono font-bold">{player.category}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -660,7 +775,7 @@ export default function PlayersPool({
           <div className="warm-card w-full max-w-xl p-6 sm:p-8 rounded-3xl border border-warm-700/60 space-y-6 relative max-h-[90vh] overflow-y-auto shadow-2xl my-auto">
             
             <div className="flex items-center justify-between border-b border-warm-700/50 pb-4">
-              <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-display">
+              <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-sans">
                 <UserPlus className="w-5 h-5 text-cyan-400" />
                 Add Player to Roster
               </h3>
@@ -820,6 +935,48 @@ export default function PlayersPool({
                   onChange={e => setNewPlayer({ ...newPlayer, cricHeroesUrl: e.target.value })}
                   className="warm-input"
                 />
+              </div>
+
+              {/* Tournament Participation & New Joiner Flags */}
+              <div className="bg-[#0b1120] p-3.5 rounded-2xl border border-emerald-500/30 space-y-2.5">
+                <span className="text-xs font-bold text-emerald-400 font-display block">
+                  Tournament Participation & Listing
+                </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#070b14] border border-emerald-500/30 text-xs text-emerald-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPlayer.isPlayingNEPL}
+                      onChange={e => setNewPlayer({ ...newPlayer, isPlayingNEPL: e.target.checked })}
+                      className="accent-emerald-400 cursor-pointer w-4 h-4"
+                    />
+                    <span className="font-bold">🏏 Listed to Play in NEPL</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#070b14] border border-cyan-500/30 text-xs text-cyan-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPlayer.isNewJoiner}
+                      onChange={e => setNewPlayer({ ...newPlayer, isNewJoiner: e.target.checked })}
+                      className="accent-cyan-400 cursor-pointer w-4 h-4"
+                    />
+                    <span className="font-bold">✨ Mark as New Joiner</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 block mb-1">Tournament Session / Target</label>
+                  <select
+                    value={newPlayer.tournamentSession}
+                    onChange={e => setNewPlayer({ ...newPlayer, tournamentSession: e.target.value })}
+                    className="w-full bg-[#070b14] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="NEPL 2026">NEPL 2026 Summer Season (Current)</option>
+                    <option value="Next Tournament Session">Next Tournament Session / Entrant</option>
+                    <option value="Future Waitlist">Future Session Waitlist</option>
+                  </select>
+                </div>
               </div>
 
               <div className="pt-4 flex justify-end space-x-3 border-t border-warm-700/50">
@@ -993,6 +1150,48 @@ export default function PlayersPool({
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Tournament Participation & New Joiner Settings */}
+              <div className="bg-emerald-950/25 p-3.5 rounded-2xl border border-emerald-500/30 space-y-2.5">
+                <span className="text-xs font-bold text-emerald-400 font-display block">
+                  Tournament Participation & Listing
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-emerald-500/30 text-xs text-emerald-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.isPlayingNEPL}
+                      onChange={(e) => setEditFormData({ ...editFormData, isPlayingNEPL: e.target.checked })}
+                      className="accent-emerald-400 cursor-pointer w-4 h-4"
+                    />
+                    <span className="font-bold">🏏 Listed to Play in NEPL</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-cyan-500/30 text-xs text-cyan-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.isNewJoiner}
+                      onChange={(e) => setEditFormData({ ...editFormData, isNewJoiner: e.target.checked })}
+                      className="accent-cyan-400 cursor-pointer w-4 h-4"
+                    />
+                    <span className="font-bold">✨ Mark as New Joiner</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 block mb-1">Tournament Session / Season</label>
+                  <select
+                    value={editFormData.tournamentSession}
+                    onChange={(e) => setEditFormData({ ...editFormData, tournamentSession: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="NEPL 2026">NEPL 2026 Summer Season (Current)</option>
+                    <option value="Next Tournament Session">Next Tournament Session / Entrant</option>
+                    <option value="Future Waitlist">Future Session Waitlist</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">

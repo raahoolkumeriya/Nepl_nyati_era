@@ -1,11 +1,17 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
+      screens: {
+        'xs': '475px',
+        '3xl': '1792px',
+        '4xl': '2160px',
+      },
       colors: {
         cyber: {
           950: '#050811',
@@ -62,12 +68,13 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Outfit', 'Inter', 'sans-serif'],
-        serif: ['Outfit', 'Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        serif: ['Newsreader', 'Georgia', 'serif'],
+        display: ['Newsreader', 'Outfit', 'Georgia', 'serif'],
+        sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       boxShadow: {
+        'anthropic-warm': '0 20px 30px -10px rgba(20, 20, 19, 0.08), 0 1px 3px 0 rgba(20, 20, 19, 0.04)',
         'neon-cyan': '0 0 20px rgba(0, 242, 254, 0.35)',
         'neon-pink': '0 0 20px rgba(255, 0, 122, 0.35)',
         'neon-emerald': '0 0 20px rgba(0, 255, 135, 0.35)',
@@ -76,7 +83,8 @@ export default {
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'glow-pulse': 'glowPulse 2s ease-in-out infinite alternate',
-        'fade-in-up': 'fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'fade-in-up': 'fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'subtle-lift': 'subtleLift 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'shake': 'shake 0.6s ease-in-out',
       },
       keyframes: {

@@ -162,3 +162,37 @@ export async function deleteRule(id) {
     method: 'DELETE',
   });
 }
+
+// ── Matches & Schedule ────────────────────────────────────────────────────────
+
+export async function fetchMatches() {
+  return apiFetch('/matches');
+}
+
+export async function saveMatches(matches) {
+  return apiFetch('/matches', {
+    method: 'PUT',
+    body: JSON.stringify(matches),
+  });
+}
+
+export async function addMatch(match) {
+  return apiFetch('/matches', {
+    method: 'POST',
+    body: JSON.stringify(match),
+  });
+}
+
+export async function updateMatch(id, data) {
+  return apiFetch(`/matches/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMatch(id) {
+  return apiFetch(`/matches/${id}`, {
+    method: 'DELETE',
+  });
+}
+

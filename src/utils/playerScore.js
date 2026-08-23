@@ -6,13 +6,14 @@
  * - Bat Power (0-100): Volume (Runs/Match), Explosiveness (Strike Rate), Consistency (Avg)
  * - Bowl Accuracy (0-100): Strike Ability (Wkts/Match, Total Wkts), Run Prevention (Economy), Clutch (Best Bowling)
  * - Match Impact (45-99%): Total game-changing value contributed per match (Runs + Wickets + SR Boost + Dot Pressure)
- * - Role-Weighted OVR (60-99): Tailored by player's primary specialty (Batsman / Bowler / All-Rounder / Keeper)
+ * - Role-Weighted OPR (60-99): Overall Performance Rating tailored by player's primary specialty (Batsman / Bowler / All-Rounder / Keeper)
  */
 
 export function calculatePlayerPerformance(player) {
   if (!player) {
     return {
       ovr: 68,
+      opr: 68,
       battingRating: 60,
       bowlingRating: 60,
       impactRating: 65,
@@ -202,6 +203,7 @@ export function calculatePlayerPerformance(player) {
 
   return {
     ovr,
+    opr: ovr,
     battingRating,
     bowlingRating,
     impactRating,

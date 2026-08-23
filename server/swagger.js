@@ -43,6 +43,7 @@ export const openApiSpec = {
     { name: 'Health', description: '🏥 System health, uptime & MongoDB Atlas connectivity status' },
     { name: 'Players', description: '🏏 Player roster management, profiles, categories, CricHeroes URLs & base prices' },
     { name: 'Teams', description: '👥 Team registration, squad allocation, purse budgets & captain assignments' },
+    { name: 'Matches & Schedule', description: '📅 Round Robin fixtures, tournament schedules, scores & NRR standings' },
     { name: 'Auction History', description: '⚡ Real-time auction bid activity logs and sold transaction records' },
     { name: 'Tournament Rules', description: '📜 Official NEPL league directives and prize pool configurations' },
   ],

@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
-import { 
-  Gavel, 
-  CheckCircle2, 
-  XCircle, 
-  ChevronRight, 
-  ChevronLeft, 
-  Shuffle, 
-  ExternalLink, 
-  Shield, 
-  Activity, 
+import {
+  Gavel,
+  CheckCircle2,
+  XCircle,
+  ChevronRight,
+  ChevronLeft,
+  Shuffle,
+  ExternalLink,
+  Shield,
+  Activity,
   Award,
   Play,
   Pause,
@@ -25,30 +25,30 @@ import { useAuth } from '../auth/AuthContext';
 import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam, isMongoDB } from '../services/api';
 import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
 
-export default function AuctionRoom({ 
-  players, 
-  setPlayers, 
-  teams, 
-  setTeams, 
-  history, 
-  setHistory 
+export default function AuctionRoom({
+  players,
+  setPlayers,
+  teams,
+  setTeams,
+  history,
+  setHistory
 }) {
   const { user, can } = useAuth();
   const isSuperAdmin = user?.role === 'superuser';
   const canBid = can('canBid');
   const canSell = can('canSellPlayer');
 
-  const availablePlayers = players.filter(p => p.status === 'available' || p.status === 'unsold');
-  
+  const availablePlayers = players.filter(p => (p.status === 'available' || p.status === 'unsold') && (p.isPlayingNEPL !== false));
+
   const [activePlayerId, setActivePlayerId] = useState(() => {
-    const firstAvail = players.find(p => p.status === 'available');
-    return firstAvail ? firstAvail.id : (players[0]?.id || null);
+    const firstAvail = players.find(p => p.status === 'available' && p.isPlayingNEPL !== false);
+    return firstAvail ? firstAvail.id : (players.find(p => p.isPlayingNEPL !== false)?.id || players[0]?.id || null);
   });
 
   useEffect(() => {
     if ((!activePlayerId || !players.some(p => p.id === activePlayerId)) && players.length > 0) {
-      const firstAvail = players.find(p => p.status === 'available');
-      setActivePlayerId(firstAvail ? firstAvail.id : players[0]?.id);
+      const firstAvail = players.find(p => p.status === 'available' && p.isPlayingNEPL !== false);
+      setActivePlayerId(firstAvail ? firstAvail.id : (players.find(p => p.isPlayingNEPL !== false)?.id || players[0]?.id));
     }
   }, [players, activePlayerId]);
 
@@ -78,7 +78,7 @@ export default function AuctionRoom({
         const validTeams = teams.filter(t => {
           const isCurrentHigh = highBidder?.id === t.id;
           const remainingPurse = t.totalPurse - t.spentPurse;
-          const maxCapacity = t.maxSquadSize || 8;
+          const maxCapacity = t.maxSquadSize || 10;
           const isFull = (t.squad?.length || 0) >= maxCapacity;
           return !isCurrentHigh && !isFull && remainingPurse >= currentBid + 50;
         });
@@ -121,7 +121,7 @@ export default function AuctionRoom({
       return;
     }
 
-    const maxSquad = team.maxSquadSize || 8;
+    const maxSquad = team.maxSquadSize || 10;
     if ((team.squad?.length || 0) >= maxSquad) {
       alert(`⚠️ Squad Limit Reached: ${team.name} has reached its ${maxSquad}-player squad capacity (configured by Super Admin)!`);
       return;
@@ -226,10 +226,10 @@ export default function AuctionRoom({
       squad: updatedSquad
     };
 
-    setPlayers(prev => prev.map(p => 
+    setPlayers(prev => prev.map(p =>
       p.id === activePlayer.id ? updatedPlayer : p
     ));
-    setTeams(prev => prev.map(t => 
+    setTeams(prev => prev.map(t =>
       t.id === buyerTeamId ? updatedTeam : t
     ));
 
@@ -287,13 +287,13 @@ export default function AuctionRoom({
 
   return (
     <div className="space-y-6">
-      
+
       {/* ── Top Control Bar ── */}
       <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 border border-warm-700/50">
         <div className="flex items-center space-x-3">
           <span className="px-3 py-1 rounded-full bg-terracotta-600/20 text-terracotta-300 font-bold text-xs border border-terracotta-500/30 flex items-center gap-1.5">
             <span className="live-dot" />
-            LIVE AUCTION ROUND
+            <span>Live Auction Round</span>
           </span>
           <span className="text-sand-500 text-xs font-mono">
             {players.filter(p => p.status === 'sold').length} / {players.length} Players Sold
@@ -304,7 +304,7 @@ export default function AuctionRoom({
           <button onClick={handlePrevPlayer} className="p-2 rounded-xl bg-warm-900 hover:bg-warm-800 text-sand-300 border border-warm-700 transition">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          
+
           <button
             onClick={handleRandomPlayer}
             className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-warm-900 hover:bg-warm-800 text-[#c9a227] font-semibold text-xs border border-[#c9a227]/30 transition"
@@ -321,11 +321,10 @@ export default function AuctionRoom({
           {can('canOverrideBid') && (
             <button
               onClick={() => setAutoSimulate(!autoSimulate)}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl font-bold text-xs border transition ${
-                autoSimulate
-                  ? 'bg-terracotta-600/20 text-terracotta-300 border-terracotta-500/50 animate-pulse'
-                  : 'bg-warm-900 text-sand-500 border-warm-700 hover:text-sand-200'
-              }`}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl font-bold text-xs border transition ${autoSimulate
+                ? 'bg-terracotta-600/20 text-terracotta-300 border-terracotta-500/50 animate-pulse'
+                : 'bg-warm-900 text-sand-500 border-warm-700 hover:text-sand-200'
+                }`}
             >
               {autoSimulate ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 text-cricket-emerald" />}
               <span>{autoSimulate ? 'Simulating…' : 'Auto-Bid Demo'}</span>
@@ -335,26 +334,26 @@ export default function AuctionRoom({
       </div>
 
       {activePlayer ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 2xl:gap-8">
+
           {/* ── LEFT: Player Card + Bid Controls ── */}
           <div className="lg:col-span-8 space-y-5">
-            
+
             {/* Player Hero Card */}
             <div className="glass-panel p-6 sm:p-8 rounded-3xl relative overflow-hidden border border-warm-700/50 shadow-2xl">
               {/* Ambient glow */}
               <div className="absolute -right-20 -top-20 w-72 h-72 bg-terracotta-600/8 rounded-full blur-3xl pointer-events-none" />
-              
+
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                
+
                 {/* Avatar */}
                 <div className="md:col-span-5 flex flex-col items-center">
                   <div className="relative group">
-                    <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-2xl overflow-hidden border-2 border-warm-600/60 shadow-2xl bg-warm-900">
+                    <div className="w-52 h-52 sm:w-60 sm:h-60 rounded-3xl overflow-hidden border-2 border-cyan-500/40 shadow-2xl bg-warm-900 shadow-cyan-500/10">
                       <img
                         src={activePlayer.avatarUrl}
                         alt={activePlayer.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-cover object-[center_15%] scale-110 group-hover:scale-115 transition duration-500"
                         onError={e => { e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'; }}
                       />
                     </div>
@@ -396,14 +395,14 @@ export default function AuctionRoom({
                         {activePlayer.role}
                       </span>
                       <span className="text-sand-600 text-xs font-mono">#{activePlayer.id}</span>
-                      {(activePlayer.isCaptain || activePlayer.captainOfTeamId || (activePlayer.status === 'sold' && activePlayer.soldPrice === 0 && activePlayer.soldTo)) && (
+                      {Boolean(activePlayer.isCaptain || activePlayer.captainOfTeamId || teams.some(t => t.captainId === activePlayer.id || t.squad?.some(s => s.id === activePlayer.id && s.isCaptain))) && (
                         <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40 flex items-center gap-1">
                           <Crown className="w-3 h-3 text-amber-400" />
                           Captain & Auctioneer
                         </span>
                       )}
                     </div>
-                    <h2 className="text-3xl sm:text-4xl font-black text-sand-100 mt-1 tracking-tight font-serif flex items-center gap-2">
+                    <h2 className="text-3xl sm:text-4xl font-extrabold text-sand-100 mt-1 tracking-tight font-sans flex items-center gap-2">
                       {activePlayer.name}
                     </h2>
                     <p className="text-sand-600 text-xs flex items-center gap-1.5 mt-0.5">
@@ -413,7 +412,7 @@ export default function AuctionRoom({
                   </div>
 
                   {/* 👑 Captain Retained Notice */}
-                  {(activePlayer.isCaptain || activePlayer.captainOfTeamId || (activePlayer.status === 'sold' && activePlayer.soldPrice === 0 && activePlayer.soldTo)) && (
+                  {Boolean(activePlayer.isCaptain || activePlayer.captainOfTeamId || teams.some(t => t.captainId === activePlayer.id || t.squad?.some(s => s.id === activePlayer.id && s.isCaptain))) && (
                     <div className="p-3 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-amber-300 flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-2">
                         <Crown className="w-5 h-5 text-amber-400" />
@@ -514,7 +513,7 @@ export default function AuctionRoom({
             {/* ── Bidding Console ── */}
             <div className="glass-panel p-6 rounded-3xl border border-warm-700/50 space-y-5">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-sand-100 flex items-center gap-2">
+                <h3 className="text-lg sm:text-xl font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
                   <Gavel className="w-5 h-5 text-terracotta-400" />
                   Team Bidding Console
                 </h3>
@@ -547,11 +546,12 @@ export default function AuctionRoom({
               )}
 
               {/* Team Bid Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 3xl:grid-cols-3 gap-4">
                 {teams.map((team) => {
                   const isLeading = highBidder?.id === team.id;
                   const remainingPurse = team.totalPurse - team.spentPurse;
-                  const isSquadFull = team.squad?.length >= 8;
+                  const maxCap = team.maxSquadSize || 10;
+                  const isSquadFull = (team.squad?.length || 0) >= maxCap;
                   const stdInc = getBidIncrement(currentBid);
                   const canAfford = remainingPurse >= (highBidder ? currentBid + stdInc : activePlayer.basePrice);
 
@@ -561,27 +561,31 @@ export default function AuctionRoom({
                   return (
                     <div
                       key={team.id}
-                      className={`p-4 pl-5 rounded-2xl border transition-all duration-200 relative overflow-hidden ${
-                        isLeading
-                          ? 'bg-[#c9a227]/10 border-[#c9a227]/50 ring-2 ring-[#c9a227]/20'
-                          : 'bg-warm-900/80 border-warm-700/60 hover:border-warm-600'
-                      }`}
+                      className={`p-4 pl-5 rounded-2xl border transition-all duration-200 relative overflow-hidden ${isLeading
+                        ? 'bg-[#c9a227]/10 border-[#c9a227]/50 ring-2 ring-[#c9a227]/20 shadow-[0_0_25px_rgba(201,162,39,0.25)]'
+                        : 'bg-warm-900/80 border-warm-700/60 hover:border-warm-600'
+                        }`}
+                      style={{
+                        boxShadow: isLeading
+                          ? `0 10px 30px -5px ${team.color || '#c9a227'}40, 0 0 15px ${team.color || '#c9a227'}20`
+                          : `0 8px 25px -6px ${team.color || '#d4622a'}25`
+                      }}
                     >
                       {/* Vertical Team Color Ribbon Accent */}
-                      <div 
-                        className="absolute top-0 bottom-0 left-0 w-1.5 transition-all duration-300" 
-                        style={{ 
+                      <div
+                        className="absolute top-0 bottom-0 left-0 w-1.5 transition-all duration-300"
+                        style={{
                           backgroundColor: team.color || '#d4622a',
-                          boxShadow: `0 0 12px ${team.color || '#d4622a'}` 
-                        }} 
+                          boxShadow: `0 0 14px ${team.color || '#d4622a'}`
+                        }}
                       />
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-2.5">
                           <span className="text-xl">{team.logo}</span>
                           <div>
-                            <h4 className="font-bold text-sand-100 text-sm">{team.name}</h4>
+                            <h4 className="font-extrabold text-sand-100 text-sm sm:text-base font-sans leading-tight">{team.name}</h4>
                             <p className="text-[10px] text-sand-600 font-mono">
-                              Purse: <span className="text-cricket-emerald font-bold">₹{remainingPurse}</span> · Squad: <span className="text-[#c9a227] font-bold">{team.squad?.length || 0}/8</span>
+                              Purse: <span className="text-cricket-emerald font-bold">₹{remainingPurse}</span> · Squad: <span className="text-[#c9a227] font-bold">{team.squad?.length || 0}/{maxCap}</span>
                             </p>
                           </div>
                         </div>
@@ -606,13 +610,12 @@ export default function AuctionRoom({
                                 setSelectedBiddingTeamId(team.id);
                                 handlePlaceBid(team, nextBidVal);
                               }}
-                              className={`flex-1 py-2 rounded-xl text-xs font-bold transition font-mono ${
-                                isDisabled
-                                  ? 'bg-warm-950 text-sand-700 border border-warm-900 cursor-not-allowed'
-                                  : isStandardRuleStep
-                                    ? 'bg-terracotta-600 hover:bg-terracotta-500 text-white border border-terracotta-400 shadow-md scale-[1.02] active:scale-95'
-                                    : 'bg-warm-800 hover:bg-cricket-emerald hover:text-warm-950 text-cricket-emerald border border-cricket-emerald/30 active:scale-95'
-                              }`}
+                              className={`flex-1 py-2 rounded-xl text-xs font-bold transition font-mono ${isDisabled
+                                ? 'bg-warm-950 text-sand-700 border border-warm-900 cursor-not-allowed'
+                                : isStandardRuleStep
+                                  ? 'bg-terracotta-600 hover:bg-terracotta-500 text-white border border-terracotta-400 shadow-md scale-[1.02] active:scale-95'
+                                  : 'bg-warm-800 hover:bg-cricket-emerald hover:text-warm-950 text-cricket-emerald border border-cricket-emerald/30 active:scale-95'
+                                }`}
                               title={isStandardRuleStep ? `Standard Tier Rule Step (+₹${inc})` : `Custom Increment (+₹${inc})`}
                             >
                               +{inc}{isStandardRuleStep ? '⚡' : ''}
@@ -639,11 +642,10 @@ export default function AuctionRoom({
                 <button
                   onClick={handleMarkSold}
                   disabled={!canSell || !highBidder || activePlayer.status === 'sold'}
-                  className={`flex-1 flex items-center justify-center space-x-2 py-3.5 px-6 rounded-2xl font-black text-sm uppercase tracking-wider transition shadow-xl ${
-                    canSell && highBidder && activePlayer.status !== 'sold'
-                      ? 'bg-gradient-to-r from-terracotta-600 to-terracotta-500 hover:from-terracotta-500 hover:to-terracotta-400 text-white shadow-terracotta-700/30 animate-pulse-glow active:scale-95'
-                      : 'bg-warm-800 text-sand-600 cursor-not-allowed border border-warm-700'
-                  }`}
+                  className={`flex-1 flex items-center justify-center space-x-2 py-3.5 px-6 rounded-2xl font-black text-sm uppercase tracking-wider transition shadow-xl ${canSell && highBidder && activePlayer.status !== 'sold'
+                    ? 'bg-gradient-to-r from-terracotta-600 to-terracotta-500 hover:from-terracotta-500 hover:to-terracotta-400 text-white shadow-terracotta-700/30 animate-pulse-glow active:scale-95'
+                    : 'bg-warm-800 text-sand-600 cursor-not-allowed border border-warm-700'
+                    }`}
                 >
                   <Gavel className="w-5 h-5 transform -rotate-45" />
                   <span>HAMMER SOLD! (₹{currentBid} PTS)</span>
@@ -654,11 +656,11 @@ export default function AuctionRoom({
 
           {/* ── RIGHT: Live Feed + Purse Standings ── */}
           <div className="lg:col-span-4 space-y-5">
-            
+
             {/* Live Bid Stream */}
             <div className="glass-panel p-5 rounded-3xl border border-warm-700/50 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-sand-100 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-sand-100 flex items-center gap-2 font-sans">
                   <Activity className="w-4 h-4 text-terracotta-400" />
                   Live Bid Stream
                 </h3>
@@ -669,35 +671,34 @@ export default function AuctionRoom({
                 {history.length > 0 ? history.map(log => (
                   <div
                     key={log.id}
-                    className={`p-3 rounded-xl text-xs border transition ${
-                      log.type === 'SOLD'
-                        ? 'bg-cricket-emerald/10 border-cricket-emerald/30 text-cricket-emerald'
-                        : log.type === 'UNSOLD'
+                    className={`p-3 rounded-xl text-xs border transition ${log.type === 'SOLD'
+                      ? 'bg-cricket-emerald/10 border-cricket-emerald/30 text-cricket-emerald'
+                      : log.type === 'UNSOLD'
                         ? 'bg-warm-900 border-warm-700 text-sand-500'
                         : 'bg-warm-900/60 border-warm-800/80 text-sand-200'
-                    }`}
+                      }`}
                   >
                     {log.type === 'SOLD' ? (
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between font-extrabold font-sans">
+                        <span className="flex items-center gap-1.5 font-sans font-extrabold">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           {log.playerName} → {log.teamName}
                         </span>
                         <span className="font-mono text-[#c9a227]">₹{log.amount}</span>
                       </div>
                     ) : log.type === 'UNSOLD' ? (
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between font-sans">
+                        <span className="flex items-center gap-1.5 font-extrabold text-sand-400">
                           <XCircle className="w-3.5 h-3.5" />
                           {log.playerName} — Unsold
                         </span>
-                        <span className="text-[10px] text-sand-600">{log.timestamp}</span>
+                        <span className="text-[10px] text-sand-600 font-mono">{log.timestamp}</span>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between font-sans">
                         <div className="flex items-center space-x-1.5">
                           <TrendingUp className="w-3 h-3 text-sand-500" />
-                          <span className="font-bold text-sand-200">{log.teamName}</span>
+                          <span className="font-extrabold text-sand-200 font-sans">{log.teamName}</span>
                           <span className="text-sand-500">bid</span>
                         </div>
                         <span className="font-bold text-[#c9a227] font-mono">₹{log.amount}</span>
@@ -714,7 +715,7 @@ export default function AuctionRoom({
 
             {/* Purse Standings */}
             <div className="glass-panel p-5 rounded-3xl border border-warm-700/50 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-sand-500">Purse Standings</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-sand-500 font-serif">PURSE STANDINGS</h4>
               <div className="space-y-2">
                 {teams.map(t => {
                   const rem = t.totalPurse - t.spentPurse;
@@ -726,7 +727,7 @@ export default function AuctionRoom({
                           <span>{t.logo}</span>
                           {t.shortName}
                         </span>
-                        <span className="font-mono text-cricket-emerald">₹{rem} ({t.squad?.length || 0}/8)</span>
+                        <span className="font-mono text-cricket-emerald">₹{rem} ({t.squad?.length || 0}/{t.maxSquadSize || 10})</span>
                       </div>
                       <div className="w-full bg-warm-950 h-1.5 rounded-full overflow-hidden">
                         <div

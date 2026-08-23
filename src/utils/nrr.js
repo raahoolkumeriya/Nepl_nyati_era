@@ -1,21 +1,38 @@
 /**
  * Calculates Net Run Rate (NRR) and updates team standings table.
- * NRR = (Total Runs Scored / Total Overs Faced) - (Total Runs Conceded / Total Overs Bowled)
+ * Standard Cricket NRR = (Total Runs Scored / Total Decimal Overs Faced) - (Total Runs Conceded / Total Decimal Overs Bowled)
  */
 
-export function calculateNRR(runsScored, oversFaced, runsConceded, oversBowled) {
-  if (!oversFaced || oversFaced === 0) return 0;
-  if (!oversBowled || oversBowled === 0) return 0;
+export function oversToBalls(ov) {
+  if (!ov || isNaN(ov)) return 0;
+  const wholeOvers = Math.floor(ov);
+  const fractionalPart = Math.round((ov - wholeOvers) * 10);
+  const balls = Math.min(5, Math.max(0, fractionalPart));
+  return wholeOvers * 6 + balls;
+}
 
-  // Convert overs like 7.3 overs into decimal overs (7 + 3/6 = 7.5 overs)
-  const parseOversToDecimal = (ov) => {
-    const whole = Math.floor(ov);
-    const balls = Math.round((ov - whole) * 10);
-    return whole + (balls / 6);
-  };
+export function ballsToOversDisplay(balls) {
+  if (!balls || balls <= 0) return '0.0';
+  const ov = Math.floor(balls / 6);
+  const b = balls % 6;
+  return `${ov}.${b}`;
+}
 
-  const decFaced = parseOversToDecimal(oversFaced);
-  const decBowled = parseOversToDecimal(oversBowled);
+export function ballsToDecimalOvers(balls) {
+  if (!balls || balls <= 0) return 0;
+  return balls / 6;
+}
+
+export function calculateNRR(runsScored, oversFacedBalls, runsConceded, oversBowledBalls) {
+  const decFaced = typeof oversFacedBalls === 'number' && oversFacedBalls > 50
+    ? oversFacedBalls / 6
+    : ballsToDecimalOvers(oversFacedBalls);
+
+  const decBowled = typeof oversBowledBalls === 'number' && oversBowledBalls > 50
+    ? oversBowledBalls / 6
+    : ballsToDecimalOvers(oversBowledBalls);
+
+  if (decFaced === 0 || decBowled === 0) return 0;
 
   const battingRR = runsScored / decFaced;
   const bowlingRR = runsConceded / decBowled;
@@ -25,15 +42,19 @@ export function calculateNRR(runsScored, oversFaced, runsConceded, oversBowled) 
 
 export function sortStandings(teams) {
   return [...teams].sort((a, b) => {
-    // 1. Points
+    // 1. Total Points
     if (b.points !== a.points) {
       return b.points - a.points;
     }
-    // 2. NRR
-    if (b.nrr !== a.nrr) {
+    // 2. Net Run Rate (NRR)
+    if (Math.abs(b.nrr - a.nrr) > 0.0001) {
       return b.nrr - a.nrr;
     }
-    // 3. Wins
-    return b.won - a.won;
+    // 3. Most Wins
+    if (b.won !== a.won) {
+      return b.won - a.won;
+    }
+    // 4. Total Runs Scored
+    return (b.runsScored || 0) - (a.runsScored || 0);
   });
 }

@@ -3,141 +3,518 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEPL · Futuristic Cyber Neon Design System
-   Palette: Deep Midnight (#070b14) · Neon Cyan (#00f2fe) · Electric Violet (#7928ca)
-   Typography: Outfit (Display) + Inter (Sans) + JetBrains Mono
+   NEPL · Anthropic Editorial Design System
+   Aesthetic: Anthropic.com / Claude.ai Editorial Minimalism & Warm Luxury
+   Typography: Newsreader (Editorial Serif) + Plus Jakarta Sans + JetBrains Mono
+   Palette: Warm Ivory/Paper (#faf9f5) · Warm Obsidian/Charcoal (#141413) · Terracotta/Ochre (#cc785c / #d97706)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
   color-scheme: dark;
 }
 
-body {
-  background-color: #070b14;
-  color: #f8fafc;
-  font-family: 'Inter', sans-serif;
-  overflow-x: hidden;
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ─── Typography & Utilities ───────────────────────────────────────────────── */
-h1, h2, h3, h4, .font-serif, .font-display {
-  font-family: 'Outfit', sans-serif;
-  letter-spacing: -0.02em;
+body {
+  background-color: #141413;
+  color: #f3f1eb;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. ANTHROPIC DARK MODE (WARM CHARCOAL & SAND)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.theme-root-container {
+  background-color: #141413;
+  background-image: 
+    radial-gradient(at 5% 0%, rgba(204, 120, 92, 0.06) 0px, transparent 50%),
+    radial-gradient(at 95% 0%, rgba(217, 119, 6, 0.05) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(56, 189, 248, 0.03) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+.glass-panel {
+  background: rgba(24, 24, 23, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(243, 241, 235, 0.09);
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-card {
+  background: rgba(30, 29, 28, 0.80);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(243, 241, 235, 0.07);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45);
+}
+
+.warm-card, .neon-card {
+  background: rgba(28, 27, 26, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(243, 241, 235, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-2.5px);
+  border-color: rgba(204, 120, 92, 0.4);
+  box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.6), 0 0 15px rgba(204, 120, 92, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. ANTHROPIC LIGHT MODE (ANTHROPIC.COM EDITORIAL PAPER & LUXURY)
+   ═══════════════════════════════════════════════════════════════════════════ */
+html.light, body.light {
+  color-scheme: light;
+  background-color: #faf9f5;
+  color: #141413;
+}
+
+html.light body {
+  background-color: #faf9f5;
+  color: #141413;
+}
+
+.light ::selection {
+  background: rgba(204, 120, 92, 0.22);
+  color: #141413;
+}
+
+.light .theme-root-container {
+  background-color: #faf9f5 !important;
+  color: #141413 !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(204, 120, 92, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(217, 119, 6, 0.04) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(204, 120, 92, 0.03) 0px, transparent 50%) !important;
+  background-attachment: fixed;
+}
+
+/* Anthropic Light Mode Cards & Surfaces */
+.light .glass-panel {
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid #e2dacc !important;
+  box-shadow: 0 4px 12px -2px rgba(20, 20, 19, 0.03), 0 20px 30px -10px rgba(20, 20, 19, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  color: #141413 !important;
+}
+
+.light .glass-card {
+  background: #ffffff !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #e2dacc !important;
+  box-shadow: 0 2px 8px -2px rgba(20, 20, 19, 0.04), 0 12px 24px -6px rgba(20, 20, 19, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  color: #141413 !important;
+}
+
+.light .warm-card, .light .neon-card {
+  background: #ffffff !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid #e2dacc !important;
+  box-shadow: 0 20px 40px -10px rgba(20, 20, 19, 0.07), 0 1px 3px 0 rgba(20, 20, 19, 0.04) !important;
+  color: #141413 !important;
+}
+
+.light .glass-card-hover:hover {
+  transform: translateY(-2.5px);
+  border-color: #cc785c !important;
+  box-shadow: 0 14px 28px -5px rgba(20, 20, 19, 0.08), 0 0 16px rgba(204, 120, 92, 0.12) !important;
+}
+
+/* Header & Nav in Anthropic Light Mode */
+.light header {
+  background: rgba(250, 249, 245, 0.94) !important;
+  border-bottom: 1px solid #e2dacc !important;
+  box-shadow: 0 4px 20px -2px rgba(20, 20, 19, 0.04) !important;
+}
+
+.light header nav {
+  background: #e2dacc !important;
+  border: 1px solid #d4ccbd !important;
+}
+
+/* Light Mode Sub-Surfaces & Boxes (#e2dacc) */
+.light .bg-warm-950, .light .bg-slate-950, .light .bg-stone-950 {
+  background-color: #e2dacc !important;
+  border-color: #d4ccbd !important;
+  color: #141413 !important;
+}
+
+.light .bg-warm-900, .light .bg-slate-900, .light .bg-stone-900, 
+.light .bg-\[\#0b1120\], .light .bg-\[\#070b14\], .light .bg-\[\#0d1627\], .light .bg-\[\#101b33\] {
+  background-color: #e2dacc !important;
+  border-color: #d4ccbd !important;
+  color: #141413 !important;
+}
+
+.light .bg-warm-900\/60, .light .bg-warm-900\/80, .light .bg-slate-900\/90, .light .bg-\[\#070b14\]\/70, .light .bg-\[\#070b14\]\/50 {
+  background-color: #ffffff !important;
+  border-color: #e2dacc !important;
+  color: #141413 !important;
+}
+
+.light .bg-warm-850, .light .bg-slate-850, .light .bg-warm-800, .light .bg-slate-800, .light .bg-stone-800, .light .bg-\[\#1c1b1a\] {
+  background-color: #e2dacc !important;
+  border-color: #d4ccbd !important;
+  color: #141413 !important;
+}
+
+.light .bg-purple-950, .light .bg-purple-950\/20, .light .bg-purple-950\/30, .light .bg-cyan-950\/30 {
+  background-color: #e2dacc !important;
+  border-color: #d4ccbd !important;
+  color: #141413 !important;
+}
+
+/* Modals & Backdrop in Light Mode */
+.light .bg-black\/80, .light .bg-warm-950\/90, .light .bg-slate-950\/80 {
+  background-color: rgba(20, 20, 19, 0.45) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Inputs & Form Controls in Anthropic Light Mode */
+.light .warm-input, .light .cyber-input, .light input, .light select, .light textarea {
+  background-color: #ffffff !important;
+  border: 1px solid #e2dacc !important;
+  color: #141413 !important;
+}
+
+.light input::placeholder, .light textarea::placeholder {
+  color: #8c887b !important;
+}
+
+.light .warm-input:focus, .light .cyber-input:focus, .light input:focus, .light select:focus, .light textarea:focus {
+  background-color: #ffffff !important;
+  border-color: #cc785c !important;
+  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.2) !important;
+}
+
+/* Anthropic High-Contrast Typography Hierarchy in Light Mode */
+.light h1, .light h2, .light h3, .light h4, .light h5, .light h6 {
+  color: #141413 !important;
+}
+
+.light .text-sand-100, .light .text-slate-100, .light .text-white {
+  color: #141413 !important;
+}
+
+.light .text-sand-200, .light .text-slate-200 {
+  color: #2a2927 !important;
+}
+
+.light .text-sand-300, .light .text-slate-300 {
+  color: #474540 !important;
+}
+
+.light .text-sand-400, .light .text-sand-500, .light .text-slate-400, .light .text-slate-500 {
+  color: #6e6b63 !important;
+}
+
+.light .text-sand-600, .light .text-slate-600 {
+  color: #8c887b !important;
+}
+
+/* Anthropic Warm Accent Colors in Light Mode */
+.light .text-cyan-300, .light .text-cyan-400 {
+  color: #0369a1 !important;
+  font-weight: 700;
+}
+
+.light .text-cyan-200, .light .text-cyan-100 {
+  color: #0c4a6e !important;
+  font-weight: 700;
+}
+
+.light .text-emerald-400, .light .text-emerald-300, .light .text-cricket-emerald {
+  color: #15803d !important;
+  font-weight: 700;
+}
+
+.light .text-amber-300, .light .text-amber-400, .light .text-\[\#c9a227\] {
+  color: #b45309 !important;
+  font-weight: 700;
+}
+
+.light .text-purple-300, .light .text-purple-400 {
+  color: #7e22ce !important;
+  font-weight: 700;
+}
+
+.light .text-rose-400, .light .text-rose-300 {
+  color: #be123c !important;
+  font-weight: 700;
+}
+
+.light .text-terracotta-400, .light .text-terracotta-500 {
+  color: #cc785c !important;
+  font-weight: 700;
+}
+
+/* Badge Pill Containers in Anthropic Light Mode */
+.light .bg-cyan-500\/10, .light .bg-cyan-500\/15, .light .bg-cyan-500\/20 {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+  color: #0369a1 !important;
+}
+
+.light .bg-emerald-500\/10, .light .bg-emerald-500\/15, .light .bg-emerald-500\/20, .light .bg-cricket-emerald\/10 {
+  background-color: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+  color: #15803d !important;
+}
+
+.light .bg-amber-500\/10, .light .bg-amber-500\/15, .light .bg-amber-500\/20, .light .bg-amber-500\/25, .light .bg-amber-950\/25, .light .bg-amber-950\/30, .light .bg-amber-950\/40 {
+  background-color: #fefce8 !important;
+  border-color: #fef08a !important;
+  color: #b45309 !important;
+}
+
+.light .bg-purple-500\/10, .light .bg-purple-500\/15, .light .bg-purple-500\/20, .light .bg-purple-500\/25 {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+  color: #7e22ce !important;
+}
+
+.light .bg-rose-500\/10, .light .bg-rose-500\/15, .light .bg-rose-500\/20 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+
+.light .bg-terracotta-600\/15, .light .bg-terracotta-600\/20, .light .bg-\[\#cc785c\]\/10 {
+  background-color: #fdf6f0 !important;
+  border-color: #f3d3c4 !important;
+  color: #a84a2a !important;
+}
+
+/* Border Hierarchy in Light Mode */
+.light .border-warm-700, .light .border-warm-800, .light .border-slate-800, .light .border-slate-700, .light .border-stone-700, .light .border-stone-800 {
+  border-color: #e2dacc !important;
+}
+
+.light .border-cyan-500\/15, .light .border-cyan-500\/20, .light .border-cyan-500\/30, .light .border-cyan-500\/40, .light .border-cyan-500\/50 {
+  border-color: #bae6fd !important;
+}
+
+.light .border-amber-500\/20, .light .border-amber-500\/30, .light .border-amber-500\/35, .light .border-amber-500\/40, .light .border-amber-500\/50 {
+  border-color: #fde68a !important;
+}
+
+.light .border-purple-500\/15, .light .border-purple-500\/20, .light .border-purple-500\/25, .light .border-purple-500\/30 {
+  border-color: #e9d5ff !important;
+}
+
+.light .border-emerald-500\/15, .light .border-emerald-500\/20, .light .border-emerald-500\/30 {
+  border-color: #bbf7d0 !important;
+}
+
+.light .border-rose-500\/25, .light .border-rose-500\/30, .light .border-rose-500\/40 {
+  border-color: #fecdd3 !important;
+}
+
+/* Tables in Light Mode */
+.light table th, .light thead th {
+  background-color: #e2dacc !important;
+  color: #141413 !important;
+  border-bottom: 1px solid #d4ccbd !important;
+}
+
+.light table td, .light tbody td {
+  border-color: #e2dacc !important;
+  color: #2a2927 !important;
+}
+
+.light tbody tr:hover {
+  background-color: #e2dacc !important;
+}
+
+.light footer {
+  border-top-color: #e2dacc !important;
+  color: #8c887b !important;
+}
+
+/* Light mode custom scrollbar */
+.light::-webkit-scrollbar-track {
+  background: #e2dacc;
+}
+
+.light::-webkit-scrollbar-thumb {
+  background: rgba(204, 120, 92, 0.35);
+  border-radius: 9999px;
+}
+
+.light::-webkit-scrollbar-thumb:hover {
+  background: rgba(204, 120, 92, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. ANTHROPIC EDITORIAL TYPOGRAPHY & GRADIENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+h1, h2, h3, h4, h5, h6, .font-serif, .font-display, .font-headline {
+  font-family: 'Newsreader', 'Georgia', 'Times New Roman', serif !important;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  letter-spacing: -0.018em;
+}
+
+body, p, label, .font-sans {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif !important;
 }
 
 .gradient-text-brand {
-  background: linear-gradient(135deg, #00f2fe 0%, #38bdf8 50%, #7928ca 100%);
+  background: linear-gradient(135deg, #cc785c 0%, #e07a5f 45%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.light .gradient-text-brand {
+  background: linear-gradient(135deg, #b45309 0%, #cc785c 50%, #141413 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .gradient-text-gold {
-  background: linear-gradient(135deg, #ffb703 0%, #fbbf24 50%, #f59e0b 100%);
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.light .gradient-text-gold {
+  background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .gradient-text-pink {
-  background: linear-gradient(135deg, #ff007a 0%, #f43f5e 100%);
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* ─── Glass & Card Primitives ─────────────────────────────────────────────── */
-.glass-panel {
-  background: rgba(11, 17, 32, 0.80);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(0, 242, 254, 0.12);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-}
-
-.glass-card {
-  background: rgba(15, 23, 42, 0.70);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(0, 242, 254, 0.10);
-}
-
-.warm-card, .neon-card {
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 242, 254, 0.18);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-}
-
-/* ─── Hover Animations & Glows ────────────────────────────────────────────── */
-.glass-card-hover {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-card-hover:hover {
-  transform: translateY(-3px);
-  border-color: rgba(0, 242, 254, 0.35);
-  box-shadow: 0 12px 30px -8px rgba(0, 242, 254, 0.25);
-}
-
-.neon-glow-cyan {
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.35);
-}
-
-.neon-glow-pink {
-  box-shadow: 0 0 20px rgba(255, 0, 122, 0.35);
-}
-
-.neon-glow-emerald {
-  box-shadow: 0 0 20px rgba(0, 255, 135, 0.35);
-}
-
-/* ─── Inputs & Buttons ────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. ANTHROPIC BUTTONS & INPUTS
+   ═══════════════════════════════════════════════════════════════════════════ */
 .warm-input, .cyber-input {
-  @apply w-full bg-[#0b1120] border border-cyan-500/20 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition-all duration-200;
+  @apply w-full bg-[#1c1b1a] border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-[#f3f1eb] placeholder-stone-500 transition-all duration-200;
 }
 
 .warm-input:focus, .cyber-input:focus {
-  @apply outline-none border-cyan-400/60 ring-2 ring-cyan-500/20 bg-[#0f172a];
+  @apply outline-none border-[#cc785c]/60 ring-2 ring-[#cc785c]/20 bg-[#242322];
 }
 
+/* Dark Mode Anthropic Button: Warm Ivory Pill */
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-slate-950 transition-all duration-200 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-400/40 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer;
-  background: linear-gradient(135deg, #00f2fe 0%, #38bdf8 100%);
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer;
+  background: linear-gradient(135deg, #f3f1eb 0%, #e5e2da 100%);
+  color: #141413;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.btn-primary:hover {
+  background: #ffffff;
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* Light Mode Anthropic Button: Deep Ink Charcoal Pill */
+.light .btn-primary {
+  color: #faf9f5 !important;
+  background: #141413 !important;
+  border: 1px solid #2a2927 !important;
+  box-shadow: 0 4px 14px rgba(20, 20, 19, 0.16) !important;
+}
+
+.light .btn-primary:hover {
+  background: #242322 !important;
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px rgba(20, 20, 19, 0.25) !important;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-slate-300 bg-slate-800/80 border border-slate-700 hover:bg-slate-700/80 hover:text-white transition-all duration-200 cursor-pointer;
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-[#e5e2da] bg-[#242322] border border-stone-700 hover:bg-[#2e2c2b] hover:text-white transition-all duration-200 cursor-pointer;
 }
 
-/* ─── Status Badges ───────────────────────────────────────────────────────── */
+.light .btn-secondary {
+  background-color: #e2dacc !important;
+  border-color: #d4ccbd !important;
+  color: #141413 !important;
+  box-shadow: 0 1px 3px rgba(20, 20, 19, 0.04) !important;
+}
+
+.light .btn-secondary:hover {
+  background-color: #d7cebe !important;
+  border-color: #c9c0b1 !important;
+  color: #141413 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. STATUS BADGES
+   ═══════════════════════════════════════════════════════════════════════════ */
 .badge-sold {
-  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/30 font-mono shadow-[0_0_12px_rgba(244,63,94,0.2)];
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono;
+}
+
+.light .badge-sold {
+  background-color: rgba(190, 18, 60, 0.08) !important;
+  color: #be123c !important;
+  border-color: rgba(190, 18, 60, 0.25) !important;
 }
 
 .badge-unsold {
-  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-slate-800 text-slate-400 border border-slate-700 font-mono;
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold uppercase tracking-wider bg-stone-800 text-stone-400 border border-stone-700 font-mono;
+}
+
+.light .badge-unsold {
+  background-color: #e2dacc !important;
+  color: #474540 !important;
+  border-color: #d4ccbd !important;
 }
 
 .badge-available {
-  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono shadow-[0_0_12px_rgba(16,185,129,0.2)];
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono;
 }
 
-/* Custom Scrollbar */
+.light .badge-available {
+  background-color: rgba(21, 128, 61, 0.08) !important;
+  color: #15803d !important;
+  border-color: rgba(21, 128, 61, 0.25) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. SCROLLBARS
+   ═══════════════════════════════════════════════════════════════════════════ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #070b14;
+  background: #141413;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 242, 254, 0.25);
+  background: rgba(204, 120, 92, 0.25);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 242, 254, 0.5);
+  background: rgba(204, 120, 92, 0.5);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -146,4 +523,19 @@ h1, h2, h3, h4, .font-serif, .font-display {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

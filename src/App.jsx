@@ -6,15 +6,18 @@ import PlayersPool from './components/PlayersPool';
 import RulesHub from './components/RulesHub';
 import ScheduleStandings from './components/ScheduleStandings';
 import ProjectorView from './components/ProjectorView';
+import GeminiChatBot from './components/GeminiChatBot';
 import LoginPage from './auth/LoginPage';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { TOURNAMENT_RULES } from './data/initialData';
 import { soundFx } from './utils/audio';
+import { useTheme } from './utils/theme';
 import { 
   fetchPlayers, savePlayers, 
   fetchTeams, saveTeams, 
   fetchHistory, saveHistory,
   fetchRules, saveRules,
+  fetchMatches, saveMatches,
   isMongoDB,
   checkServerHealth,
 } from './services/api';
@@ -22,11 +25,13 @@ import {
 // ─── Inner App (needs Auth context) ─────────────────────────────────────────
 function AppInner() {
   const { user, isAuthenticated, can } = useAuth();
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState('auction');
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isDbConnected, setIsDbConnected] = useState(false);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
 
   useEffect(() => {
     soundFx.enabled = soundEnabled;
@@ -64,6 +69,14 @@ function AppInner() {
     } catch { return TOURNAMENT_RULES; }
   });
 
+  // ── Matches & Schedule state ──────────────────────────────────────────────
+  const [matches, setMatches] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nepl_matches');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
   // ── Load from MongoDB on mount ────────────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) {
@@ -77,17 +90,21 @@ function AppInner() {
         setIsDbConnected(serverUp);
         
         if (serverUp) {
-          const [dbPlayers, dbTeams, dbHistory, dbRules] = await Promise.all([
+          const [dbPlayers, dbTeams, dbHistory, dbRules, dbMatches] = await Promise.all([
             fetchPlayers(),
             fetchTeams(),
             fetchHistory(),
             fetchRules(),
+            fetchMatches().catch(() => []),
           ]);
 
           setPlayers(Array.isArray(dbPlayers) ? dbPlayers : []);
           setTeams(Array.isArray(dbTeams) ? dbTeams : []);
           setHistory(Array.isArray(dbHistory) ? dbHistory : []);
           setRules(Array.isArray(dbRules) && dbRules.length ? dbRules : TOURNAMENT_RULES);
+          if (Array.isArray(dbMatches) && dbMatches.length > 0) {
+            setMatches(dbMatches);
+          }
         }
       } catch (err) {
         console.warn('[App] MongoDB load failed:', err);
@@ -115,6 +132,10 @@ function AppInner() {
   useEffect(() => {
     try { localStorage.setItem('nepl_rules', JSON.stringify(rules)); } catch {}
   }, [rules]);
+
+  useEffect(() => {
+    try { localStorage.setItem('nepl_matches', JSON.stringify(matches)); } catch {}
+  }, [matches]);
 
   // ── Persist to MongoDB Atlas (debounced) ──────────────────────────────────
   useEffect(() => {
@@ -149,6 +170,14 @@ function AppInner() {
     return () => clearTimeout(timer);
   }, [rules, isDbConnected, isLoading]);
 
+  useEffect(() => {
+    if (!isDbConnected || isLoading) return;
+    const timer = setTimeout(() => {
+      saveMatches(matches).catch(err => console.warn('Save matches to MongoDB failed:', err));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [matches, isDbConnected, isLoading]);
+
   // ── Reset data (Restricted Exclusively to Supreme Master) ─────────────────────
   const handleResetData = useCallback(async () => {
     if (!user || user.role !== 'suprememaster') {
@@ -161,7 +190,8 @@ function AppInner() {
       "This will permanently purge:\n" +
       "• All registered teams & purse records\n" +
       "• All player pool rosters & sold histories\n" +
-      "• All live auction bid logs\n\n" +
+      "• All live auction bid logs\n" +
+      "• All match schedules and scorecards\n\n" +
       "To confirm this action, type the exact phrase below:\n" +
       "RESET NEPL 2026 MONGODB DATA"
     );
@@ -172,13 +202,15 @@ function AppInner() {
         setPlayers([]);
         setHistory([]);
         setRules(TOURNAMENT_RULES);
+        setMatches([]);
         localStorage.removeItem('nepl_teams');
         localStorage.removeItem('nepl_players');
         localStorage.removeItem('nepl_history');
         localStorage.removeItem('nepl_rules');
+        localStorage.removeItem('nepl_matches');
         if (isMongoDB) {
           try {
-            await Promise.all([savePlayers([]), saveTeams([]), saveHistory([])]);
+            await Promise.all([savePlayers([]), saveTeams([]), saveHistory([]), saveMatches([])]);
             alert("✅ MongoDB Atlas database successfully cleared by Supreme Master.");
           } catch (err) {
             console.warn('Reset MongoDB error:', err);
@@ -227,7 +259,7 @@ function AppInner() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-16">
+    <div className="min-h-screen bg-[#141413] text-[#f3f1eb] font-sans pb-16 theme-root-container transition-colors duration-300">
 
       {/* Fullscreen Projector View */}
       {isProjectorMode ? (
@@ -250,9 +282,10 @@ function AppInner() {
             onResetData={handleResetData}
             players={players}
             setPlayers={setPlayers}
+            onOpenAiChat={() => setIsAiChatOpen(true)}
           />
 
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 animate-fade-in-up">
+          <main className="max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-4 sm:pt-6 animate-fade-in-up">
             {activeTab === 'auction' && (
               <AuctionRoom
                 players={players}
@@ -269,6 +302,7 @@ function AppInner() {
                 setTeams={setTeams}
                 players={players}
                 setPlayers={setPlayers}
+                onOpenAiChat={() => setIsAiChatOpen(true)}
               />
             )}
             {activeTab === 'players' && (
@@ -279,12 +313,34 @@ function AppInner() {
                 setTeams={setTeams}
               />
             )}
-            {activeTab === 'rules' && <RulesHub rules={rules} setRules={setRules} />}
-            {activeTab === 'schedule' && <ScheduleStandings teams={teams} />}
+            {activeTab === 'rules' && (
+              <RulesHub
+                rules={rules}
+                setRules={setRules}
+                onOpenAiChat={() => setIsAiChatOpen(true)}
+              />
+            )}
+            {activeTab === 'schedule' && (
+              <ScheduleStandings
+                teams={teams}
+                matches={matches}
+                setMatches={setMatches}
+              />
+            )}
           </main>
 
+          {/* Gemini-Powered AI Tournament Strategist & Team Balancer */}
+          <GeminiChatBot
+            players={players}
+            setPlayers={setPlayers}
+            teams={teams}
+            setTeams={setTeams}
+            isOpen={isAiChatOpen}
+            setIsOpen={setIsAiChatOpen}
+          />
+
           {/* Global Cyber Footer */}
-          <footer className="mt-16 border-t border-cyan-500/15 pt-6 pb-8 text-center text-xs text-slate-400 font-mono flex flex-col sm:flex-row items-center justify-between gap-3 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <footer className="mt-16 border-t border-cyan-500/15 pt-6 pb-8 text-center text-xs text-slate-400 font-mono flex flex-col sm:flex-row items-center justify-between gap-3 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
             <div>
               © 2026 onwards Nyati Era Premier League. All rights reserved.
             </div>

@@ -21,6 +21,9 @@ const PlayerSchema = new mongoose.Schema({
   isCaptain: { type: Boolean, default: false },
   isAuctioneer: { type: Boolean, default: false },
   captainOfTeamId: { type: String, default: null },
+  isPlayingNEPL: { type: Boolean, default: true },
+  isNewJoiner: { type: Boolean, default: false },
+  tournamentSession: { type: String, default: 'NEPL 2026' },
 }, { timestamps: true });
 
 export default mongoose.model('Player', PlayerSchema);

@@ -13,6 +13,14 @@ A full-stack React + Node.js application for live cricket player auctions, team 
 | Database | MongoDB Atlas (via Mongoose) |
 | Auth | Role-based (Session) |
 
+## 📐 System Design & Architecture
+
+Comprehensive design documentation, C4 models, ERDs, and sequence flows are available in the [`design/`](file:///Users/raahool/applications/github/Nepl_nyati_era/design/README.md) directory:
+- 📖 [**Design Hub & README**](file:///Users/raahool/applications/github/Nepl_nyati_era/design/README.md)
+- 🏛️ [**High-Level Design (HLD)**](file:///Users/raahool/applications/github/Nepl_nyati_era/design/HLD.md)
+- ⚙️ [**Low-Level Design (LLD)**](file:///Users/raahool/applications/github/Nepl_nyati_era/design/LLD.md)
+- 📊 [**Architecture Diagrams (Mermaid Models)**](file:///Users/raahool/applications/github/Nepl_nyati_era/design/ARCHITECTURE.md)
+
 ---
 
 ## Architecture
@@ -88,8 +96,8 @@ Go to **Atlas → Network Access** and add your IP address (or `0.0.0.0/0` for d
 
 ## Auth Credentials
 
-| Role | Email | 
-|---|---|---|
+| Role | Email| 
+|---|---|
 | ⚡ Super Admin | `admin@nepl.in` |
 | 🔨 Auctioneer | `auction@nepl.in` |
 | 🏏 Player | `player@nepl.in` | 
