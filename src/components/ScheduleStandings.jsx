@@ -42,6 +42,7 @@ import { useAuth } from '../auth/AuthContext';
 import { calculateNRR, sortStandings, oversToBalls, ballsToOversDisplay, ballsToDecimalOvers } from '../utils/nrr';
 import { updateMatch as apiUpdateMatch, deleteMatch as apiDeleteMatch, saveMatches as apiSaveMatches } from '../services/api';
 import { generateAIGroupFixtures } from '../services/gemini';
+import FormattedChatMessage from './FormattedChatMessage';
 
 const DEFAULT_SLOTS = [
   'Saturday Morning (Slot 1)',
@@ -748,7 +749,7 @@ export default function ScheduleStandings({ teams = [], matches = [], setMatches
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/50 bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 space-y-4 text-center relative overflow-hidden shadow-[0_0_50px_rgba(201,162,39,0.25)] animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-widest shadow-lg">
             <Trophy className="w-4 h-4 text-slate-950" />
-            <span>NEPL 2026 OFFICIAL CHAMPIONS 🏆</span>
+            <span>NEPL {new Date().getFullYear()} OFFICIAL CHAMPIONS 🏆</span>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-2">
@@ -782,7 +783,7 @@ export default function ScheduleStandings({ teams = [], matches = [], setMatches
             </span>
             <div>
               <h3 className="text-lg sm:text-xl font-extrabold text-white font-sans flex items-center gap-2 tracking-tight">
-                NEPL 2026 Points Table & NRR Standings
+                NEPL {new Date().getFullYear()} Points Table & NRR Standings
               </h3>
               <p className="text-sand-500 text-xs">
                 Dynamically calculated from all completed league matches. Sorted by Points $\rightarrow$ NRR $\rightarrow$ Wins.
@@ -1372,8 +1373,8 @@ export default function ScheduleStandings({ teams = [], matches = [], setMatches
                         Source: <span className="text-cyan-400">{aiFixtureResult.source}</span>
                       </span>
                     </div>
-                    <div className="whitespace-pre-wrap font-sans text-xs sm:text-sm leading-relaxed">
-                      {aiFixtureResult.aiCommentary}
+                    <div className="border-t border-cyan-500/15 pt-2 font-sans">
+                      <FormattedChatMessage content={aiFixtureResult.aiCommentary} />
                     </div>
                   </div>
 

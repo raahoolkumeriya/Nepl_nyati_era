@@ -203,7 +203,7 @@ export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-semibold">
                 <Sparkles className="w-3.5 h-3.5 animate-pulse text-cyan-400" />
-                <span>Official 2026 Summer Season Blueprint</span>
+                <span>Official {new Date().getFullYear()} Summer Season Blueprint</span>
               </div>
 
               {isCustomized && (
@@ -385,7 +385,7 @@ export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
                   <RotateCw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white font-display">Female Strike Rotation Mechanism</h3>
+                  <h3 className="text-lg font-extrabold text-white font-sans tracking-tight">Female Strike Rotation Mechanism</h3>
                   <p className="text-xs text-slate-400">Continuous 3-player circular loop across 3 overs</p>
                 </div>
               </div>

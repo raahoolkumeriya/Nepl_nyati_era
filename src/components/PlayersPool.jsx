@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import { compressImage } from '../utils/imageCompressor';
 import { updatePlayer as apiUpdatePlayer } from '../services/api';
+import { CURRENT_YEAR, CURRENT_SEASON_TAG } from '../utils/season';
 
 export default function PlayersPool({ 
   players = [], 
@@ -59,7 +60,7 @@ export default function PlayersPool({
     avatarUrl: '/avatars/male.png',
     isPlayingNEPL: true,
     isNewJoiner: true,
-    tournamentSession: 'NEPL 2026'
+    tournamentSession: CURRENT_SEASON_TAG
   });
 
   // Super Admin Edit Player State
@@ -76,7 +77,7 @@ export default function PlayersPool({
     auctioneerPassword: (import.meta.env.VITE_AUCTIONEER_PASS || '').trim(),
     isPlayingNEPL: true,
     isNewJoiner: false,
-    tournamentSession: 'NEPL 2026'
+    tournamentSession: CURRENT_SEASON_TAG
   });
 
   const defaultAuctioneerPass = (import.meta.env.VITE_AUCTIONEER_PASS || '').trim();
@@ -98,7 +99,7 @@ export default function PlayersPool({
       auctioneerPassword: defaultAuctioneerPass,
       isPlayingNEPL: player.isPlayingNEPL !== false,
       isNewJoiner: Boolean(player.isNewJoiner),
-      tournamentSession: player.tournamentSession || 'NEPL 2026'
+      tournamentSession: player.tournamentSession || CURRENT_SEASON_TAG
     });
   };
 
@@ -370,7 +371,7 @@ export default function PlayersPool({
       soldTo: null,
       isPlayingNEPL: Boolean(newPlayer.isPlayingNEPL),
       isNewJoiner: Boolean(newPlayer.isNewJoiner),
-      tournamentSession: newPlayer.tournamentSession || 'NEPL 2026'
+      tournamentSession: newPlayer.tournamentSession || CURRENT_SEASON_TAG
     };
     setPlayers(prev => [createdPlayer, ...prev]);
     apiUpdatePlayer(createdPlayer.id, createdPlayer).catch(console.warn);
@@ -392,7 +393,7 @@ export default function PlayersPool({
       avatarUrl: '/avatars/male.png',
       isPlayingNEPL: true,
       isNewJoiner: true,
-      tournamentSession: 'NEPL 2026'
+      tournamentSession: CURRENT_SEASON_TAG
     });
   };
 
@@ -436,7 +437,7 @@ export default function PlayersPool({
               NEPL Players Pool & Roster
             </h2>
             <p className="text-sand-400 text-xs mt-2 max-w-xl">
-              Browse stats, roles, categories, and auction status for all registered players in Season 2026.
+              Browse stats, roles, categories, and auction status for all registered players in Season {CURRENT_YEAR}.
             </p>
           </div>
 
@@ -453,26 +454,26 @@ export default function PlayersPool({
       </div>
 
       {/* Filter Bar */}
-      <div className="glass-panel p-4 rounded-2xl border border-warm-700/50 space-y-3">
+      <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-warm-700/50 space-y-3.5">
         {/* Tournament Roster & Playing Status Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-warm-800/60">
+        <div className="flex flex-wrap items-center gap-2 pb-2.5 border-b border-warm-800/60">
           {[
-            { id: 'All', label: 'All Players', count: players.length, color: 'text-slate-300' },
-            { id: 'playing', label: '🏏 Playing NEPL (Active)', count: players.filter(p => p.isPlayingNEPL !== false).length, color: 'text-emerald-400' },
-            { id: 'reserve', label: '⏳ Next Session / Reserve', count: players.filter(p => p.isPlayingNEPL === false).length, color: 'text-amber-400' },
-            { id: 'new_joiner', label: '✨ New Joiners', count: players.filter(p => p.isNewJoiner).length, color: 'text-cyan-300' },
+            { id: 'All', label: 'All Players', count: players.length, color: 'text-slate-800 dark:text-slate-200' },
+            { id: 'playing', label: '🏏 Playing NEPL (Active)', count: players.filter(p => p.isPlayingNEPL !== false).length, color: 'text-emerald-700 dark:text-emerald-300' },
+            { id: 'reserve', label: '⏳ Next Session / Reserve', count: players.filter(p => p.isPlayingNEPL === false).length, color: 'text-amber-700 dark:text-amber-300' },
+            { id: 'new_joiner', label: '✨ New Joiners', count: players.filter(p => p.isNewJoiner).length, color: 'text-sky-700 dark:text-cyan-300' },
           ].map(pill => (
             <button
               key={pill.id}
               onClick={() => setTournamentFilter(pill.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs sm:text-sm font-bold transition cursor-pointer ${
                 tournamentFilter === pill.id
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-bold shadow-[0_0_12px_rgba(0,242,254,0.3)]'
-                  : 'bg-warm-900/80 text-slate-400 border border-warm-700/60 hover:text-slate-200'
+                  ? 'bg-cyan-500/25 text-sky-800 dark:text-cyan-300 border border-cyan-500/60 shadow-[0_0_12px_rgba(0,242,254,0.25)]'
+                  : 'bg-warm-900/80 text-slate-600 dark:text-slate-400 border border-warm-700/60 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <span>{pill.label}</span>
-              <span className={`px-1.5 py-0.2 rounded-md bg-warm-950 font-black text-[10px] ${pill.color}`}>
+              <span className={`px-2 py-0.5 rounded-md bg-warm-950/80 font-black text-xs ${pill.color}`}>
                 {pill.count}
               </span>
             </button>
@@ -481,13 +482,13 @@ export default function PlayersPool({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
-            <Search className="w-4 h-4 text-sand-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search players…"
+              placeholder="Search players by name, role…"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-warm-900 border border-warm-700 rounded-xl pl-10 pr-4 py-2.5 text-xs text-sand-100 placeholder-sand-600 focus:outline-none focus:border-terracotta-500 transition"
+              className="w-full bg-warm-900 border border-warm-700 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-sand-100 placeholder-slate-500 focus:outline-none focus:border-terracotta-500 transition font-medium"
             />
           </div>
           <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className={selectClass}>
@@ -520,16 +521,16 @@ export default function PlayersPool({
 
       {/* Promoted Auctioneer Success Callout */}
       {promotedInfo && (
-        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl animate-fade-in">
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl animate-fade-in">
           <div className="flex items-center space-x-3">
             <span className="text-2xl p-2 bg-amber-500/20 rounded-xl border border-amber-500/40">🔨</span>
             <div>
-              <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
+              <h4 className="font-extrabold text-amber-700 dark:text-amber-300 text-sm sm:text-base flex items-center gap-2">
                 <span>Auctioneer Console Access Granted for {promotedInfo.name}!</span>
-                <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] uppercase">Active</span>
+                <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-xs uppercase">Active</span>
               </h4>
-              <p className="text-xs text-sand-300 font-mono mt-0.5">
-                Login: <strong className="text-white">{promotedInfo.email}</strong> • Password: <strong className="text-amber-300">{promotedInfo.password}</strong>
+              <p className="text-xs sm:text-sm text-sand-300 font-mono mt-0.5">
+                Login: <strong className="text-slate-900 dark:text-white">{promotedInfo.email}</strong> • Password: <strong className="text-amber-700 dark:text-amber-300">{promotedInfo.password}</strong>
               </p>
             </div>
           </div>
@@ -539,13 +540,13 @@ export default function PlayersPool({
                 navigator.clipboard.writeText(`Email: ${promotedInfo.email}\nPassword: ${promotedInfo.password}\nRole: ${promotedInfo.role}\nURL: ${window.location.origin}`);
                 alert(`📋 Copied login credentials for ${promotedInfo.name} to clipboard!`);
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm"
             >
               Copy Credentials
             </button>
             <button
               onClick={() => setPromotedInfo(null)}
-              className="p-1.5 rounded-xl text-sand-400 hover:text-sand-200 bg-warm-900 border border-warm-700 cursor-pointer"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-200 bg-warm-900 border border-warm-700 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -568,12 +569,12 @@ export default function PlayersPool({
           return (
             <div
               key={player.id}
-              className={`glass-card p-5 rounded-2xl border glass-card-hover flex flex-col justify-between space-y-4 relative overflow-hidden group ${
+              className={`glass-card p-5 rounded-2xl border glass-card-hover flex flex-col justify-between space-y-4 relative overflow-hidden group shadow-md ${
                 isCap ? 'border-amber-500/50 bg-amber-950/10' : isAuctioneer ? 'border-cyan-500/30' : 'border-warm-700/50'
               }`}
             >
               {/* Status stripe */}
-              <div className={`absolute top-0 left-0 right-0 h-0.5 ${
+              <div className={`absolute top-0 left-0 right-0 h-1 ${
                 isCap ? 'bg-amber-400' :
                 player.status === 'sold' ? 'bg-terracotta-600' : 
                 player.status === 'unsold' ? 'bg-warm-600' : 'bg-cricket-emerald'
@@ -588,27 +589,27 @@ export default function PlayersPool({
                     <button
                       type="button"
                       onClick={() => handleTogglePlayingNEPL(player)}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase transition cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold uppercase transition cursor-pointer ${
                         isPlaying
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                          ? 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
                       }`}
                       title={canEdit || can('canManageTeams') ? "Click to toggle: Playing in NEPL vs Next Session/Reserve" : "Tournament status"}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                      <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-500 dark:bg-emerald-400 animate-pulse' : 'bg-amber-500 dark:bg-amber-400'}`} />
                       <span>{isPlaying ? '🏏 Playing' : '⏳ Reserve'}</span>
                     </button>
 
                     {isNewJoiner && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[9px] font-mono font-bold">
-                        <Sparkles className="w-2.5 h-2.5" />
+                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-cyan-500/20 text-sky-800 dark:text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold">
+                        <Sparkles className="w-3 h-3 text-cyan-500 dark:text-cyan-400" />
                         <span>New</span>
                       </span>
                     )}
 
                     {(isCap || isAuctioneer) && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-black uppercase">
-                        {isCap ? <Crown className="w-2.5 h-2.5 text-amber-400" /> : <Zap className="w-2 h-2 text-cyan-300" />}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-800 dark:text-amber-300 text-[10px] font-black uppercase">
+                        {isCap ? <Crown className="w-3 h-3 text-amber-500 dark:text-amber-400" /> : <Zap className="w-2.5 h-2.5 text-cyan-400" />}
                         {isCap ? 'Captain' : 'Auctioneer'}
                       </span>
                     )}
@@ -619,32 +620,32 @@ export default function PlayersPool({
                     {can('canManageUsers') && (
                       <button
                         onClick={() => handleQuickGrantAuctioneer(player)}
-                        className={`p-1 rounded-lg border transition cursor-pointer ${
+                        className={`p-1.5 rounded-lg border transition cursor-pointer ${
                           player.isAuctioneer
                             ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
                             : 'bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border-warm-700/60 hover:border-amber-500/40'
                         }`}
                         title={player.isAuctioneer ? `⚡ Auctioneer access active for ${player.name}` : `⚡ Grant Auctioneer Console Login to ${player.name}`}
                       >
-                        <Zap className={`w-3 h-3 ${player.isAuctioneer ? 'text-amber-400 fill-amber-400' : ''}`} />
+                        <Zap className={`w-3.5 h-3.5 ${player.isAuctioneer ? 'text-amber-400 fill-amber-400' : ''}`} />
                       </button>
                     )}
                     {canEdit && (
                       <button
                         onClick={() => openEditPlayerModal(player)}
-                        className="p-1 rounded-lg bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border border-warm-700/60 hover:border-amber-500/40 transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-amber-950/80 text-slate-400 hover:text-amber-300 border border-warm-700/60 hover:border-amber-500/40 transition cursor-pointer"
                         title={`Edit ${player.name} & Roles`}
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                     )}
                     {canDelete && (
                       <button
                         onClick={() => handleDeletePlayer(player)}
-                        className="p-1 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-warm-900/80 hover:bg-rose-950/80 text-slate-500 hover:text-rose-400 border border-warm-700/60 hover:border-rose-500/40 transition cursor-pointer"
                         title={`Delete ${player.name}`}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -673,7 +674,7 @@ export default function PlayersPool({
                       title="Upload compressed photo"
                     >
                       <Camera className="w-5 h-5 text-cyan-300" />
-                      <span className="text-[9px] font-bold text-cyan-200 uppercase tracking-tight mt-0.5">Photo</span>
+                      <span className="text-[10px] font-bold text-cyan-200 uppercase tracking-tight mt-0.5">Photo</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -684,56 +685,56 @@ export default function PlayersPool({
                   </div>
 
                   <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="font-extrabold text-sand-100 text-base sm:text-lg leading-tight font-sans break-words" title={player.name}>
+                    <h3 className="font-extrabold text-slate-900 dark:text-sand-100 text-base sm:text-lg leading-tight font-sans break-words" title={player.name}>
                       <span className="inline-flex items-center gap-1.5 flex-wrap">
                         <span>{player.name}</span>
                         {player.cricHeroesUrl && (
-                          <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300 inline-flex items-center shrink-0 p-0.5 rounded hover:bg-amber-400/10 transition" title="Open CricHeroes Profile">
-                            <ExternalLink className="w-3.5 h-3.5" />
+                          <a href={player.cricHeroesUrl} target="_blank" rel="noreferrer" className="text-amber-500 hover:text-amber-400 inline-flex items-center shrink-0 p-0.5 rounded hover:bg-amber-400/15 transition" title="Open CricHeroes Profile">
+                            <ExternalLink className="w-4 h-4" />
                           </a>
                         )}
                       </span>
                     </h3>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="text-xs text-cyan-300 font-bold tracking-wide">{player.role}</span>
-                      <span className="text-sand-600 text-xs font-mono">•</span>
-                      <span className="text-[11px] text-amber-400 font-mono font-bold">{player.category}</span>
+                      <span className="text-xs sm:text-sm text-sky-700 dark:text-cyan-300 font-bold tracking-wide">{player.role}</span>
+                      <span className="text-slate-400 font-mono text-xs">•</span>
+                      <span className="text-xs text-amber-700 dark:text-amber-400 font-mono font-bold">{player.category}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Stats grid */}
-                <div className="mt-4 grid grid-cols-3 gap-1 bg-warm-950/60 p-2.5 rounded-xl border border-warm-800/50 text-center font-mono">
+                {/* Stats grid - Crisp High Contrast in Both Light & Dark Mode */}
+                <div className="mt-4 grid grid-cols-3 gap-1 bg-[#f4efe6] dark:bg-[#070b14]/90 p-2.5 sm:p-3 rounded-2xl border border-[#e2dacc] dark:border-cyan-500/20 text-center font-mono shadow-sm">
                   {[
-                    { label: 'Matches', value: player.matches, color: 'text-sand-200' },
-                    { label: 'Runs', value: player.runs, color: 'text-emerald-400' },
-                    { label: 'Wkts', value: player.wickets, color: 'text-cyan-400' },
+                    { label: 'Matches', value: player.matches ?? 0, color: 'text-slate-900 dark:text-slate-100' },
+                    { label: 'Runs', value: player.runs ?? 0, color: 'text-emerald-700 dark:text-emerald-400' },
+                    { label: 'Wkts', value: player.wickets ?? 0, color: 'text-sky-700 dark:text-cyan-400' },
                   ].map((s, i) => (
-                    <div key={i} className={i > 0 ? 'border-l border-warm-800' : ''}>
-                      <span className="text-[9px] uppercase text-slate-500 block">{s.label}</span>
-                      <span className={`text-xs font-bold ${s.color}`}>{s.value}</span>
+                    <div key={i} className={i > 0 ? 'border-l border-[#d4ccbd] dark:border-slate-800' : ''}>
+                      <span className="text-[11px] sm:text-xs uppercase font-extrabold text-slate-700 dark:text-slate-400 tracking-wider block">{s.label}</span>
+                      <span className={`text-sm sm:text-base font-black ${s.color}`}>{s.value}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="pt-3 border-t border-warm-800/60 flex items-center justify-between">
+              <div className="pt-3 border-t border-warm-800/60 flex items-center justify-between gap-2">
                 <div>
-                  <span className="text-[9px] text-slate-500 font-mono block uppercase">Base Price</span>
-                  <span className="text-xs font-bold text-sand-300 font-mono">₹{player.basePrice}</span>
+                  <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 font-mono block uppercase font-bold tracking-wider">Base Price</span>
+                  <span className="text-sm sm:text-base font-black text-slate-900 dark:text-sand-200 font-mono">₹{player.basePrice}</span>
                 </div>
                 <div>
                   {isCap && buyerTeam ? (
                     <span 
-                      className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border flex items-center space-x-1.5 font-mono bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm"
+                      className="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold uppercase tracking-wider border flex items-center space-x-1.5 font-mono bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40 shadow-sm"
                     >
-                      <Crown className="w-3.5 h-3.5 text-amber-400" />
+                      <Crown className="w-4 h-4 text-amber-500 dark:text-amber-400" />
                       <span>{buyerTeam.logo} {buyerTeam.shortName} · 0 PTS (Captain)</span>
                     </span>
                   ) : player.status === 'sold' && buyerTeam ? (
                     <span 
-                      className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider border flex items-center space-x-1.5 font-mono shadow-md"
+                      className="px-3 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold uppercase tracking-wider border flex items-center space-x-1.5 font-mono shadow-md"
                       style={{ 
                         backgroundColor: `${buyerTeam.color || '#10b981'}20`, 
                         color: buyerTeam.color || '#10b981',
@@ -741,17 +742,17 @@ export default function PlayersPool({
                         boxShadow: `0 0 10px ${buyerTeam.color || '#10b981'}35`
                       }}
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <CheckCircle2 className="w-4 h-4" />
                       <span>{buyerTeam.logo} {buyerTeam.shortName} ₹{player.soldPrice}</span>
                     </span>
                   ) : player.status === 'unsold' ? (
-                    <span className="badge-unsold">
-                      <XCircle className="w-3 h-3" />
+                    <span className="badge-unsold text-xs sm:text-sm font-bold">
+                      <XCircle className="w-3.5 h-3.5" />
                       Unsold
                     </span>
                   ) : (
-                    <span className="badge-available">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="badge-available text-xs sm:text-sm font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                       Available
                     </span>
                   )}
@@ -972,7 +973,7 @@ export default function PlayersPool({
                     onChange={e => setNewPlayer({ ...newPlayer, tournamentSession: e.target.value })}
                     className="w-full bg-[#070b14] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-400"
                   >
-                    <option value="NEPL 2026">NEPL 2026 Summer Season (Current)</option>
+                    <option value={CURRENT_SEASON_TAG}>{CURRENT_SEASON_TAG} Summer Season (Current)</option>
                     <option value="Next Tournament Session">Next Tournament Session / Entrant</option>
                     <option value="Future Waitlist">Future Session Waitlist</option>
                   </select>
@@ -1187,7 +1188,7 @@ export default function PlayersPool({
                     onChange={(e) => setEditFormData({ ...editFormData, tournamentSession: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-400"
                   >
-                    <option value="NEPL 2026">NEPL 2026 Summer Season (Current)</option>
+                    <option value={CURRENT_SEASON_TAG}>{CURRENT_SEASON_TAG} Summer Season (Current)</option>
                     <option value="Next Tournament Session">Next Tournament Session / Entrant</option>
                     <option value="Future Waitlist">Future Session Waitlist</option>
                   </select>

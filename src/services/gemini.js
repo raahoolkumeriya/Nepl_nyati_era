@@ -68,7 +68,7 @@ export function calculatePlayerRating(player) {
  * - 3 Female Players
  * - 7 Male / General Players
  */
-export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeamNames = [], onlyActivePlayers = true) {
+export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeamNames = [], onlyActivePlayers = true, targetSquadSize = 10) {
   if (!Array.isArray(playersList) || playersList.length === 0) {
     return { error: 'No players available in the pool to generate teams.' };
   }
@@ -88,7 +88,8 @@ export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeam
     'Neon Challengers', 'Vortex Gladiators'
   ];
 
-  const numTeams = Math.max(2, Math.min(10, teamCount));
+  const numTeams = Math.max(2, Math.min(24, teamCount));
+  const maxSquad = Math.max(4, Math.min(30, Number(targetSquadSize) || 10));
 
   // Augment players with calculated ratings
   const augmented = eligiblePlayers.map(p => {
@@ -129,6 +130,7 @@ export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeam
       shortName: (customTeamNames[i] ? customTeamNames[i].substring(0, 3) : theme.shortName).toUpperCase(),
       logo: theme.logo || '🏏',
       color: theme.color || '#3b82f6',
+      maxSquadSize: maxSquad,
       players: [],
       captain: null,
       viceCaptain: null,
@@ -160,7 +162,7 @@ export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeam
         .map(t => t.idx);
 
       for (const tIdx of sortedTeamIndices) {
-        if (poolCopy.length > 0) {
+        if (poolCopy.length > 0 && teams[tIdx].players.length < maxSquad) {
           const picked = poolCopy.shift();
           teams[tIdx].players.push(picked);
           teams[tIdx].categoryCounts[picked.normalizedCategory] = (teams[tIdx].categoryCounts[picked.normalizedCategory] || 0) + 1;
@@ -171,21 +173,27 @@ export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeam
     return poolCopy; // unallocated leftovers if any
   };
 
-  // 1. Distribute Super Masters (1 each)
-  const leftSuper = distributeCategory(superMasters, 1);
-  // 2. Distribute Masters (1 each)
-  const leftMasters = distributeCategory(masters, 1);
-  // 3. Distribute Females (3 each)
-  const leftFemales = distributeCategory(females, 3);
-  // 4. Distribute Males (7 each)
-  const leftMales = distributeCategory(males, 7);
+  // Dynamic distribution quotas based on target squad size
+  const superPerTeam = Math.min(Math.floor(superMasters.length / numTeams), 1);
+  const masterPerTeam = Math.min(Math.floor(masters.length / numTeams), 1);
+  const femalePerTeam = Math.min(Math.floor(females.length / numTeams), Math.max(1, Math.round(maxSquad * 0.25)));
+  const malePerTeam = Math.max(1, maxSquad - superPerTeam - masterPerTeam - femalePerTeam);
 
-  // Remaining players if squad not complete or leftovers
+  // 1. Distribute Super Masters
+  const leftSuper = distributeCategory(superMasters, superPerTeam > 0 ? superPerTeam : 1);
+  // 2. Distribute Masters
+  const leftMasters = distributeCategory(masters, masterPerTeam > 0 ? masterPerTeam : 1);
+  // 3. Distribute Females
+  const leftFemales = distributeCategory(females, femalePerTeam);
+  // 4. Distribute Males
+  const leftMales = distributeCategory(males, malePerTeam);
+
+  // Remaining players if squad not complete up to maxSquad
   const allLeftovers = [...leftSuper, ...leftMasters, ...leftFemales, ...leftMales];
   while (allLeftovers.length > 0) {
     const leastSquadTeam = teams
-      .filter(t => t.players.length < 12)
-      .sort((a, b) => a.totalRating - b.totalRating)[0];
+      .filter(t => t.players.length < maxSquad)
+      .sort((a, b) => a.players.length - b.players.length || a.totalRating - b.totalRating)[0];
     
     if (!leastSquadTeam) break;
     const player = allLeftovers.shift();
@@ -226,7 +234,8 @@ export function generateBalancedNEFLTeams(playersList, teamCount = 4, customTeam
     teams,
     totalPlayersAssigned: teams.reduce((acc, t) => acc + t.players.length, 0),
     unassignedPlayers: allLeftovers,
-    formula: 'NEFL 2026 Summer Season: 1 Super Master + 1 Master + 3 Females + 7 Males balanced by performance index'
+    squadSizePerTeam: maxSquad,
+    formula: `NEFL ${new Date().getFullYear()} Season: ${maxSquad} Players/Squad balanced by composite skill ratings and category quotas`
   };
 }
 
@@ -242,12 +251,13 @@ export async function queryGeminiChat({
   teams = []
 }) {
   const effectiveKey = apiKey || (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : '') || '';
+  const currentYear = new Date().getFullYear();
 
   const systemContext = `
-You are the Official "NEPL AI Tournament Strategist & Rules Arbitrator" for the Nyati Era Premier League (NEPL) Box Cricket 2026.
-You are fully knowledgeable about all tournament formats, especially the official **NEPL (Nyati Era Premiere League) 2026 Summer Season Format**.
+You are the Official "NEPL AI Tournament Strategist & Rules Arbitrator" for the Nyati Era Premier League (NEPL) Box Cricket ${currentYear}.
+You are fully knowledgeable about all tournament formats, especially the official **NEPL (Nyati Era Premiere League) ${currentYear} Summer Season Format**.
 
-=== OFFICIAL NEPL 2026 RULES KNOWLEDGE BASE ===
+=== OFFICIAL NEPL ${currentYear} RULES KNOWLEDGE BASE ===
 ${NEFL_2026_RAW_RULES_TEXT}
 
 === ACTIVE TOURNAMENT STATE ===
@@ -621,7 +631,7 @@ export async function generateAIGroupFixtures({
     generatedMatches.push({
       id: `match-ai-${Date.now()}-${matchCounter}`,
       matchNumber: matchCounter,
-      round: 'NEPL 2026 Grand Championship Final 🏆👑',
+      round: `NEPL ${new Date().getFullYear()} Grand Championship Final 🏆👑`,
       group: 'Knockout',
       stage: 'final',
       team1Id: '',
@@ -662,7 +672,7 @@ ${Object.entries(groups).map(([gName, gTeams]) => `  * **${gName} (${gTeams.leng
 
   if (effectiveKey) {
     try {
-      const geminiPrompt = `You are the Official Tournament Director & Chief Scorer for NEPL (Nyati Era Premier League) Box Cricket 2026.
+      const geminiPrompt = `You are the Official Tournament Director & Chief Scorer for NEPL (Nyati Era Premier League) Box Cricket ${new Date().getFullYear()}.
 The tournament organizer asked: "${prompt || 'Divide teams into Group A and Group B and create the round robin matches and finals'}".
 
 Here are the registered teams:

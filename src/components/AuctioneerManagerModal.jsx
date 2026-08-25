@@ -235,8 +235,8 @@ export default function AuctioneerManagerModal({ isOpen, onClose, players = [], 
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="warm-card w-full max-w-2xl p-6 sm:p-8 rounded-3xl border border-warm-700/60 space-y-6 relative max-h-[90vh] overflow-y-auto shadow-2xl my-auto">
+    <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+      <div className="warm-card w-full max-w-5xl lg:max-w-6xl xl:max-w-7xl p-5 sm:p-8 rounded-3xl border border-warm-700/60 space-y-6 relative max-h-[92vh] overflow-y-auto shadow-2xl my-auto">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-warm-700/50 pb-4">
@@ -245,16 +245,16 @@ export default function AuctioneerManagerModal({ isOpen, onClose, players = [], 
               <Shield className="w-3 h-3" />
               SUPER ADMIN CONSOLE
             </div>
-            <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-serif">
-              <UserCheck className="w-5 h-5 text-terracotta-400" />
+            <h3 className="text-xl sm:text-2xl font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
+              <UserCheck className="w-5 h-5 sm:w-6 sm:h-6 text-terracotta-400" />
               Manage Auctioneers & Player Access
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-sand-500 hover:text-sand-200 bg-warm-900 border border-warm-700 cursor-pointer"
+            className="p-2 rounded-xl text-sand-500 hover:text-sand-200 bg-warm-900 border border-warm-700 cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -308,221 +308,219 @@ export default function AuctioneerManagerModal({ isOpen, onClose, players = [], 
           </div>
         )}
 
-        {/* Tab Switcher */}
-        <div className="flex rounded-2xl bg-warm-900/90 p-1 border border-warm-800 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setActiveTab('promote_player')}
-            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === 'promote_player'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                : 'text-sand-400 hover:text-sand-200'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>⚡ Convert Player to Auctioneer</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('custom_user')}
-            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === 'custom_user'
-                ? 'bg-terracotta-600/20 text-terracotta-300 border border-terracotta-500/40 shadow-sm'
-                : 'text-sand-400 hover:text-sand-200'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>➕ Invite Custom User</span>
-          </button>
-        </div>
-
-        {/* TAB 1: Convert Player from Pool */}
-        {activeTab === 'promote_player' && (
-          <div className="bg-warm-900/70 p-5 rounded-2xl border border-amber-500/30 space-y-4">
-            <div>
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-2">
-                <Gavel className="w-4 h-4 text-amber-400" />
-                Select Tournament Player to Grant Auctioneer Access
-              </h4>
-              <p className="text-[11px] text-sand-400 mt-1">
-                Converts any registered tournament player into an active <strong>Auction Member</strong> or <strong>Super Admin</strong> with full console access.
-              </p>
+        {/* ── Wide Two-Column Grid on Desktop ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* Left Column: Promote Player / Invite User Form */}
+          <div className="lg:col-span-5 space-y-4">
+            
+            {/* Tab Switcher */}
+            <div className="flex rounded-2xl bg-warm-900/90 p-1 border border-warm-800 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveTab('promote_player')}
+                className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeTab === 'promote_player'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-sand-400 hover:text-sand-200'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Convert Player</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('custom_user')}
+                className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeTab === 'custom_user'
+                    ? 'bg-terracotta-600/20 text-terracotta-300 border border-terracotta-500/40 shadow-sm'
+                    : 'text-sand-400 hover:text-sand-200'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Invite User</span>
+              </button>
             </div>
 
-            <form onSubmit={handlePromotePlayerSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-sand-300 block mb-1">
-                  Choose Player from Tournament Pool ({players.length} Players)
-                </label>
-                <select
-                  value={selectedPlayerId}
-                  onChange={e => handleSelectPlayer(e.target.value)}
-                  className="warm-input cursor-pointer font-sans"
-                  required
-                >
-                  <option value="">-- Select Player to Promote --</option>
-                  {players.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} · {p.role} ({p.category}) {p.isAuctioneer ? '⚡ [Already Auctioneer]' : ''} {p.isCaptain ? '👑 [Captain]' : ''}
-                    </option>
-                  ))}
-                </select>
+            {/* TAB 1: Convert Player from Pool */}
+            {activeTab === 'promote_player' && (
+              <div className="bg-warm-900/70 p-5 rounded-2xl border border-amber-500/30 space-y-4">
+                <div>
+                  <h4 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-amber-300 flex items-center gap-2 font-sans">
+                    <Gavel className="w-4 h-4 text-amber-400" />
+                    Select Tournament Player
+                  </h4>
+                  <p className="text-[11px] text-sand-400 mt-1">
+                    Converts any registered tournament player into an active <strong>Auction Member</strong> or <strong>Super Admin</strong>.
+                  </p>
+                </div>
+
+                <form onSubmit={handlePromotePlayerSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="text-xs font-bold text-sand-300 block mb-1">
+                      Choose Player from Roster ({players.length} Available)
+                    </label>
+                    <select
+                      value={selectedPlayerId}
+                      onChange={(e) => handleSelectPlayer(e.target.value)}
+                      className="warm-input cursor-pointer text-xs"
+                      required
+                    >
+                      <option value="">-- Choose a player --</option>
+                      {players.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} · {p.role} {p.isAuctioneer ? '(Already Auctioneer)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-warm-800">
+                    <div>
+                      <label className="text-xs font-bold text-sand-300 block mb-1">Assigned Login Email</label>
+                      <input
+                        type="email"
+                        value={playerEmail}
+                        onChange={(e) => setPlayerEmail(e.target.value)}
+                        className="warm-input font-mono text-xs"
+                        placeholder="e.g. rahul.sharma@nepl.in"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-sand-300 block mb-1">Assign Access Role</label>
+                        <select
+                          value={playerRole}
+                          onChange={(e) => setPlayerRole(e.target.value)}
+                          className="warm-input cursor-pointer text-xs"
+                        >
+                          <option value="auctioneer">🔨 Auction Member</option>
+                          <option value="superuser">⚡ Super Admin</option>
+                          <option value="player">🏏 Player (View Only)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-sand-300 block mb-1">Login Password</label>
+                        <input
+                          type="text"
+                          value={playerPassword}
+                          onChange={(e) => setPlayerPassword(e.target.value)}
+                          className="warm-input font-mono text-xs text-amber-300 font-bold"
+                          placeholder="Password..."
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={!selectedPlayerId}
+                        className="btn-primary flex items-center gap-2 cursor-pointer text-xs px-5 py-2.5 disabled:opacity-50"
+                      >
+                        <Zap className="w-4 h-4 text-amber-400" />
+                        <span>Grant Auctioneer Access</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* TAB 2: Custom User Invitation */}
+            {activeTab === 'custom_user' && (
+              <div className="bg-warm-900/70 p-5 rounded-2xl border border-terracotta-500/30 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Generated Login Email</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. rahul.kumeriya@nepl.in"
-                    value={playerEmail}
-                    onChange={e => setPlayerEmail(e.target.value)}
-                    className="warm-input font-mono text-xs"
-                  />
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-terracotta-300 flex items-center gap-2">
+                    <UserPlus className="w-4 h-4 text-terracotta-400" />
+                    Create Custom User Account
+                  </h4>
+                  <p className="text-[11px] text-sand-400 mt-1">
+                    Add a dedicated official or guest account with custom credentials.
+                  </p>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Login Password</label>
-                  <input
-                    type="text"
-                    required
-                    value={playerPassword}
-                    onChange={e => setPlayerPassword(e.target.value)}
-                    className="warm-input font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Grant Access Role</label>
-                  <select
-                    value={playerRole}
-                    onChange={e => setPlayerRole(e.target.value)}
-                    className="warm-input cursor-pointer"
-                  >
-                    <option value="auctioneer">🔨 Auction Member (Bidding Console)</option>
-                    <option value="superuser">⚡ Super Admin (Bidding, Hammer Sold & Management)</option>
-                    <option value="player">🏏 Player (Roster View Only)</option>
-                  </select>
-                </div>
-
-                <div className="pt-4">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                <form onSubmit={handleCustomSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="text-xs font-bold text-sand-300 block mb-1">Full Name</label>
                     <input
-                      type="checkbox"
-                      checked={tagProfileAsAuctioneer}
-                      onChange={e => setTagProfileAsAuctioneer(e.target.checked)}
-                      className="rounded text-amber-500 focus:ring-amber-400"
+                      type="text"
+                      value={customForm.name}
+                      onChange={(e) => setCustomForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="warm-input text-xs"
+                      placeholder="e.g. Amit Patil"
+                      required
                     />
-                    <span className="text-xs text-sand-300">
-                      Tag player profile as <strong>Auctioneer</strong> in database
-                    </span>
-                  </label>
-                </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-sand-300 block mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={customForm.email}
+                      onChange={(e) => setCustomForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="warm-input text-xs font-mono"
+                      placeholder="e.g. amit@nyatiera.com"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-sand-300 block mb-1">Access Role</label>
+                      <select
+                        value={customForm.role}
+                        onChange={(e) => setCustomForm(prev => ({ ...prev, role: e.target.value }))}
+                        className="warm-input cursor-pointer text-xs"
+                      >
+                        <option value="auctioneer">🔨 Auction Member</option>
+                        <option value="superuser">⚡ Super Admin</option>
+                        <option value="player">🏏 Player (View Only)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-sand-300 block mb-1">Password</label>
+                      <input
+                        type="text"
+                        value={customForm.password}
+                        onChange={(e) => setCustomForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="warm-input font-mono text-xs text-amber-300 font-bold"
+                        placeholder="Secret password"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      className="btn-primary flex items-center gap-2 cursor-pointer text-xs px-5 py-2.5"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Create User Account</span>
+                    </button>
+                  </div>
+                </form>
               </div>
+            )}
 
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={!selectedPlayerId}
-                  className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>Convert Player & Grant Login</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* TAB 2: Custom User Registration */}
-        {activeTab === 'custom_user' && (
-          <div className="bg-warm-900/70 p-5 rounded-2xl border border-warm-700/50 space-y-4">
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#c9a227] flex items-center gap-2">
-              <UserPlus className="w-4 h-4" />
-              Add Custom User Credentials
-            </h4>
-
-            <form onSubmit={handleCustomSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Vikram Sharma"
-                    value={customForm.name}
-                    onChange={e => setCustomForm({ ...customForm, name: e.target.value })}
-                    className="warm-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. vikram@nepl.in"
-                    value={customForm.email}
-                    onChange={e => setCustomForm({ ...customForm, email: e.target.value })}
-                    className="warm-input font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Password</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. AuctionPass2026"
-                    value={customForm.password}
-                    onChange={e => setCustomForm({ ...customForm, password: e.target.value })}
-                    className="warm-input font-mono text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-sand-400 block mb-1">Access Role</label>
-                  <select
-                    value={customForm.role}
-                    onChange={e => setCustomForm({ ...customForm, role: e.target.value })}
-                    className="warm-input cursor-pointer"
-                  >
-                    <option value="auctioneer">🔨 Auction Member (Bidding Console)</option>
-                    <option value="player">🏏 Player (Roster View Only)</option>
-                    <option value="superuser">⚡ Super Admin (Bidding, Hammer Sold & Management)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  className="btn-primary flex items-center gap-2 cursor-pointer"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Create User Account</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Existing Users Directory with LIVE ROLE SWITCHER */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between border-b border-warm-800 pb-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-sand-300 flex items-center gap-2">
-              <UserCheck2 className="w-4 h-4 text-terracotta-400" />
-              <span>Registered Accounts & Live Role Switcher ({usersList.length})</span>
-            </h4>
-            <span className="text-[10px] text-sand-500 font-mono">Real-time Permissions</span>
           </div>
 
-          <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+          {/* Right Column: Existing Users Directory & Real-Time Role Switcher */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex items-center justify-between border-b border-warm-800 pb-2">
+              <h4 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-sand-200 flex items-center gap-2 font-sans">
+                <UserCheck2 className="w-4 h-4 text-terracotta-400" />
+                <span>Registered Accounts & Live Permissions ({usersList.length})</span>
+              </h4>
+              <span className="text-[10px] text-cyan-400 font-mono">Real-time Permissions</span>
+            </div>
+
+            <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
             {usersList.map((u) => {
               const roleCfg = getRoleConfig(u.role);
               const isCurrentUser = currentUser?.email.toLowerCase() === u.email.toLowerCase();
@@ -661,7 +659,9 @@ export default function AuctioneerManagerModal({ isOpen, onClose, players = [], 
                 </div>
               );
             })}
+            </div>
           </div>
+
         </div>
 
       </div>

@@ -430,36 +430,36 @@ export default function AuctionRoom({
                   )}
 
                   {/* Price Banner */}
-                  <div className="grid grid-cols-2 gap-3 bg-warm-900/80 p-4 rounded-2xl border border-warm-700/50">
+                  <div className="grid grid-cols-2 gap-3 bg-[#f4efe6] dark:bg-[#070b14]/90 p-4 rounded-2xl border border-[#e2dacc] dark:border-cyan-500/20 shadow-sm">
                     <div>
-                      <span className="text-sand-500 text-[10px] font-semibold uppercase tracking-wider block mb-0.5">Base Price</span>
-                      <span className="text-lg font-bold text-sand-200 font-mono">₹{activePlayer.basePrice} PTS</span>
+                      <span className="text-slate-600 dark:text-slate-400 text-xs font-extrabold uppercase tracking-wider block mb-0.5">Base Price</span>
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-sand-200 font-mono">₹{activePlayer.basePrice} PTS</span>
                     </div>
-                    <div className="border-l border-warm-700 pl-3">
-                      <span className="text-[#c9a227] text-[10px] font-semibold uppercase tracking-wider block mb-0.5">Current Bid</span>
-                      <span className="text-2xl font-black text-[#c9a227] font-mono">₹{currentBid} PTS</span>
+                    <div className="border-l border-[#d4ccbd] dark:border-slate-800 pl-3">
+                      <span className="text-amber-700 dark:text-[#c9a227] text-xs font-extrabold uppercase tracking-wider block mb-0.5">Current Bid</span>
+                      <span className="text-2xl sm:text-3xl font-black text-amber-700 dark:text-[#c9a227] font-mono">₹{currentBid} PTS</span>
                     </div>
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-4 gap-2 text-center bg-warm-950/60 p-3 rounded-xl border border-warm-800/60">
+                  <div className="grid grid-cols-4 gap-2 text-center bg-[#f4efe6] dark:bg-[#070b14]/90 p-3 rounded-2xl border border-[#e2dacc] dark:border-cyan-500/20 shadow-sm">
                     {[
-                      { label: 'Matches', value: activePlayer.matches, color: 'text-sand-200' },
-                      { label: 'Runs', value: activePlayer.runs, color: 'text-cricket-emerald' },
-                      { label: 'SR', value: activePlayer.strikeRate, color: 'text-[#c9a227]' },
-                      { label: 'Wkts', value: activePlayer.wickets, color: 'text-terracotta-400' },
+                      { label: 'Matches', value: activePlayer.matches ?? 0, color: 'text-slate-900 dark:text-sand-200' },
+                      { label: 'Runs', value: activePlayer.runs ?? 0, color: 'text-emerald-700 dark:text-cricket-emerald' },
+                      { label: 'SR', value: activePlayer.strikeRate ?? '-', color: 'text-amber-700 dark:text-[#c9a227]' },
+                      { label: 'Wkts', value: activePlayer.wickets ?? 0, color: 'text-sky-700 dark:text-cyan-400' },
                     ].map((s, i) => (
-                      <div key={i} className={`p-1 ${i > 0 ? 'border-l border-warm-800' : ''}`}>
-                        <span className="text-sand-600 text-[9px] uppercase font-medium block">{s.label}</span>
-                        <span className={`text-sm font-bold ${s.color}`}>{s.value}</span>
+                      <div key={i} className={`p-1 ${i > 0 ? 'border-l border-[#d4ccbd] dark:border-slate-800' : ''}`}>
+                        <span className="text-slate-600 dark:text-slate-400 text-[11px] sm:text-xs uppercase font-extrabold block tracking-wider">{s.label}</span>
+                        <span className={`text-base sm:text-lg font-black ${s.color}`}>{s.value}</span>
                       </div>
                     ))}
                   </div>
 
                   {activePlayer.wickets > 0 && (
-                    <div className="flex items-center justify-between text-xs text-sand-500 px-3 py-2 bg-warm-900/40 rounded-lg border border-warm-800/40 font-mono">
-                      <span>Economy: <strong className="text-sand-300">{activePlayer.economy} rpo</strong></span>
-                      <span>Best: <strong className="text-cricket-emerald">{activePlayer.bestBowling}</strong></span>
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-slate-700 dark:text-sand-300 px-3.5 py-2.5 bg-[#f4efe6] dark:bg-warm-900/40 rounded-xl border border-[#e2dacc] dark:border-warm-800/40 font-mono">
+                      <span>Economy: <strong className="text-slate-900 dark:text-sand-100 font-extrabold">{activePlayer.economy} rpo</strong></span>
+                      <span>Best: <strong className="text-emerald-700 dark:text-cricket-emerald font-extrabold">{activePlayer.bestBowling}</strong></span>
                     </div>
                   )}
 

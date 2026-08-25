@@ -24,11 +24,15 @@ import {
   UserPlus,
   Repeat,
   Palette,
-  Check
+  Check,
+  Camera,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { updateTeam as apiUpdateTeam, deleteTeam as apiDeleteTeam, updatePlayer as apiUpdatePlayer, isMongoDB } from '../services/api';
 import { TEAM_COLOR_THEMES, getThemeByColor, getThemeByIndex } from '../data/teamThemes';
+import { compressImage } from '../utils/imageCompressor';
 
 export default function TeamsView({ teams, setTeams, players = [], setPlayers, onOpenAiChat }) {
   const { can, usersList } = useAuth();
@@ -36,6 +40,8 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
   const [showModal, setShowModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
+  const [photoInfo, setPhotoInfo] = useState('');
 
   // Quick Captain Assignment Modal State
   const [captainModalTeam, setCaptainModalTeam] = useState(null);
@@ -104,6 +110,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
   // Super Admin Bulk Roster Override Hub Modal State
   const [rosterHubOpen, setRosterHubOpen] = useState(false);
+  const [rosterHubSearch, setRosterHubSearch] = useState('');
 
   // Auctioneers list from usersList
   const auctioneers = usersList ? usersList.filter(u => u.role === 'auctioneer' || u.role === 'superuser') : [];
@@ -117,12 +124,39 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
     totalPurse: 10000,
     maxSquadSize: 10,
     color: '#d4622a',
+    teamPhotoUrl: '',
   });
 
   const LOGO_OPTIONS = ['🏏', '🦁', '⚡', '👑', '🦅', '⚔️', '🔥', '🛡️', '🎯', '🐯', '🌪️', '🐆'];
 
+  const handleManualTeamPhotoUpload = async (e, directTeamId = null) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setCompressingPhoto(true);
+      // High-definition lightweight compressed image (max 900x600, ~30-50KB)
+      const compressedDataUrl = await compressImage(file, 900, 600, 0.75);
+      const approxKb = Math.round((compressedDataUrl.length * 3) / 4 / 1024);
+      setPhotoInfo(`Compressed ~${approxKb} KB`);
+
+      if (directTeamId) {
+        // Direct update from team tile
+        await handleUpdateTeamPhoto(directTeamId, compressedDataUrl);
+      } else {
+        // Update in form data modal
+        setFormData(prev => ({ ...prev, teamPhotoUrl: compressedDataUrl }));
+      }
+    } catch (err) {
+      alert('Error compressing team photo: ' + err.message);
+    } finally {
+      setCompressingPhoto(false);
+    }
+  };
+
   const openCreateModal = () => {
     setEditingTeam(null);
+    setPhotoInfo('');
     // Find first unused color theme
     const usedColors = new Set(teams.map(t => (t.color || '').toLowerCase()));
     const availableTheme = TEAM_COLOR_THEMES.find(t => !usedColors.has(t.color.toLowerCase())) || TEAM_COLOR_THEMES[0];
@@ -136,6 +170,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       totalPurse: 10000,
       maxSquadSize: 10,
       color: availableTheme.color,
+      teamPhotoUrl: '',
     });
     setShowModal(true);
   };
@@ -152,6 +187,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
   const openEditModal = (team) => {
     setEditingTeam(team);
+    setPhotoInfo('');
     const existingCaptain = (team.squad || []).find(p => p.isCaptain) || 
       players.find(p => p.captainOfTeamId === team.id || (p.isCaptain && p.soldTo === team.id));
 
@@ -164,6 +200,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       totalPurse: team.totalPurse || 10000,
       maxSquadSize: team.maxSquadSize || 10,
       color: team.color || '#d4622a',
+      teamPhotoUrl: team.teamPhotoUrl || '',
     });
     setShowModal(true);
   };
@@ -189,7 +226,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
               isAuctioneer: false,
               captainOfTeamId: null,
             };
-            apiUpdatePlayer(oldCaptainId, freed).catch(console.warn);
+            apiUpdatePlayer(p.id, freed).catch(err => console.warn('Free captain sync error:', err));
             return freed;
           }
           return p;
@@ -197,44 +234,64 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       }
     }
 
-    // 2. If a new captain player is chosen, add to squad with 0 credit & update player
-    let captainPlayer = null;
+    // 2. If a new captain is selected, add them into the squad
+    let assignedCaptainName = targetTeam.owner || '';
     if (newCaptainPlayerId) {
-      captainPlayer = players.find(p => p.id === newCaptainPlayerId);
-      if (captainPlayer) {
-        // Remove from existing team if in another team
-        updatedSquad = updatedSquad.filter(p => p.id !== newCaptainPlayerId);
+      const playerObj = players.find(p => p.id === newCaptainPlayerId);
+      if (playerObj) {
+        assignedCaptainName = playerObj.name;
         
-        const squadMember = {
-          id: captainPlayer.id,
-          name: captainPlayer.name,
-          role: captainPlayer.role,
-          category: captainPlayer.category || 'Male',
-          soldPrice: 0, // 0 credit deduction!
-          avatarUrl: captainPlayer.avatarUrl,
-          cricHeroesUrl: captainPlayer.cricHeroesUrl,
+        // Remove player from existing team if they were on another team
+        teams.forEach(otherTeam => {
+          if (otherTeam.id !== teamId && otherTeam.squad?.some(s => s.id === newCaptainPlayerId)) {
+            const cleanedSquad = otherTeam.squad.filter(s => s.id !== newCaptainPlayerId);
+            const cleanedTeam = {
+              ...otherTeam,
+              captainId: otherTeam.captainId === newCaptainPlayerId ? null : otherTeam.captainId,
+              captainName: otherTeam.captainId === newCaptainPlayerId ? null : otherTeam.captainName,
+              playersCount: cleanedSquad.length,
+              squad: cleanedSquad
+            };
+            setTeams(prev => prev.map(t => t.id === otherTeam.id ? cleanedTeam : t));
+            apiUpdateTeam(otherTeam.id, cleanedTeam).catch(err => console.warn('Clean team captain sync error:', err));
+          }
+        });
+
+        // Add captain into target squad if not already present
+        const existingIdx = updatedSquad.findIndex(s => s.id === newCaptainPlayerId);
+        const captainSquadMember = {
+          id: playerObj.id,
+          name: playerObj.name,
+          role: playerObj.role || 'Batting All-Rounder',
+          category: playerObj.category || 'Male',
+          soldPrice: 0,
+          avatarUrl: playerObj.avatarUrl || '/avatars/male.png',
+          cricHeroesUrl: playerObj.cricHeroesUrl || '',
           isCaptain: true,
-          isAuctioneer: true,
+          captainOfTeamId: teamId,
         };
 
-        // Place captain at top of squad
-        updatedSquad = [squadMember, ...updatedSquad];
+        if (existingIdx >= 0) {
+          updatedSquad[existingIdx] = captainSquadMember;
+        } else {
+          updatedSquad.unshift(captainSquadMember);
+        }
 
-        // Update player record in global state & backend
+        // Update player record in players state & DB
         if (setPlayers) {
           setPlayers(prev => prev.map(p => {
             if (p.id === newCaptainPlayerId) {
-              const updated = {
+              const updatedP = {
                 ...p,
                 status: 'sold',
-                soldPrice: 0,
                 soldTo: teamId,
+                soldPrice: 0,
                 isCaptain: true,
                 isAuctioneer: true,
                 captainOfTeamId: teamId,
               };
-              apiUpdatePlayer(newCaptainPlayerId, updated).catch(console.warn);
-              return updated;
+              apiUpdatePlayer(p.id, updatedP).catch(err => console.warn('Captain player sync error:', err));
+              return updatedP;
             }
             return p;
           }));
@@ -242,21 +299,14 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       }
     }
 
-    // 3. Recalculate spent purse (sum of soldPrice, captain is 0)
-    const spentPurse = updatedSquad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0);
-    const playersCount = updatedSquad.length;
-
-    const updatedTeam = {
+    return {
       ...targetTeam,
-      owner: captainPlayer ? captainPlayer.name : (targetTeam.owner || 'Auctioneer Captain'),
-      captainId: captainPlayer ? captainPlayer.id : null,
-      captainName: captainPlayer ? captainPlayer.name : null,
-      spentPurse,
-      playersCount,
+      captainId: newCaptainPlayerId || null,
+      captainName: newCaptainPlayerId ? assignedCaptainName : null,
+      owner: assignedCaptainName || targetTeam.owner || 'Auctioneer Captain',
+      playersCount: updatedSquad.length,
       squad: updatedSquad,
     };
-
-    return updatedTeam;
   };
 
   const handleSubmit = (e) => {
@@ -282,6 +332,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         totalPurse: validPurse,
         maxSquadSize: maxSquad,
         color: formData.color,
+        teamPhotoUrl: formData.teamPhotoUrl !== undefined ? formData.teamPhotoUrl : (editingTeam.teamPhotoUrl || ''),
       };
 
       const finalTeam = applyCaptainAssignment(baseUpdatedTeam, formData.captainPlayerId, editingTeam.captainId);
@@ -307,6 +358,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         maxSquadSize: maxSquad,
         spentPurse: 0,
         playersCount: 0,
+        teamPhotoUrl: formData.teamPhotoUrl || '',
         squad: [],
       };
 
@@ -332,6 +384,55 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
     setCaptainModalTeam(null);
     setSelectedCaptainId('');
+  };
+
+  // Super Admin: Update max squad size for all teams at once
+  const handleUpdateAllSquadSizes = (newSize) => {
+    if (!canManage) return;
+    const targetSize = Math.max(1, Number(newSize) || 10);
+    const updatedTeams = teams.map(t => ({
+      ...t,
+      maxSquadSize: targetSize,
+    }));
+    setTeams(updatedTeams);
+    updatedTeams.forEach(t => {
+      apiUpdateTeam(t.id, t).catch(err => console.warn('Update team capacity error:', err));
+    });
+  };
+
+  // Super Admin: Update max squad size for a single team
+  const handleUpdateSingleTeamSquadSize = (teamId, newSize) => {
+    if (!canManage) return;
+    const targetSize = Math.max(1, Number(newSize) || 10);
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    const updated = { ...team, maxSquadSize: targetSize };
+    setTeams(prev => prev.map(t => t.id === teamId ? updated : t));
+    apiUpdateTeam(teamId, updated).catch(err => console.warn('Update team capacity error:', err));
+  };
+
+  // Super Admin: Set / Update Official Team Squad Picture
+  const handleUpdateTeamPhoto = async (teamId, photoDataUrl) => {
+    try {
+      const updated = teams.map(t => {
+        if (t.id === teamId) {
+          return {
+            ...t,
+            teamPhotoUrl: photoDataUrl
+          };
+        }
+        return t;
+      });
+      setTeams(updated);
+
+      const targetTeam = updated.find(t => t.id === teamId);
+      if (targetTeam) {
+        await apiUpdateTeam(teamId, targetTeam).catch(e => console.warn('Team photo save notice:', e));
+      }
+    } catch (err) {
+      console.error('Failed to update team picture:', err);
+      alert(`Could not save team picture: ${err.message}`);
+    }
   };
 
   const handleDeleteTeam = (teamToDelete) => {
@@ -679,14 +780,38 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
         <div className="flex flex-wrap items-center gap-2.5 text-xs font-sans">
           {canManage && (
-            <button
-              onClick={() => setRosterHubOpen(true)}
-              className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs shadow-[0_0_12px_rgba(0,242,254,0.25)] transition cursor-pointer"
-              title="Super Admin: Roster Override & Player Swapper Hub"
-            >
-              <ArrowLeftRight className="w-4 h-4 text-cyan-400" />
-              <span>Roster Override Hub</span>
-            </button>
+            <>
+              {/* Quick Squad Limit Selector */}
+              <div className="flex flex-wrap items-center gap-1 bg-[#f4efe6] dark:bg-warm-900 px-2.5 py-1.5 rounded-xl border border-[#e2dacc] dark:border-warm-700 shadow-sm">
+                <span className="text-[11px] font-bold text-slate-700 dark:text-sand-300">Squad Size:</span>
+                {[8, 10, 11, 12, 14, 15, 16, 18, 20].map(size => {
+                  const isActive = teams.length > 0 && teams.every(t => (t.maxSquadSize || 10) === size);
+                  return (
+                    <button
+                      key={size}
+                      onClick={() => handleUpdateAllSquadSizes(size)}
+                      className={`px-2 py-0.5 rounded-lg text-xs font-mono font-black transition cursor-pointer ${
+                        isActive
+                          ? 'bg-cyan-500 text-slate-950 shadow'
+                          : 'text-slate-600 dark:text-sand-400 hover:text-slate-900 dark:hover:text-sand-100'
+                      }`}
+                      title={`Set all teams max squad size to ${size} players`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setRosterHubOpen(true)}
+                className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-sky-800 dark:text-cyan-300 border border-cyan-500/40 font-bold text-xs shadow-[0_0_12px_rgba(0,242,254,0.25)] transition cursor-pointer"
+                title="Super Admin: Roster Override & Player Swapper Hub"
+              >
+                <ArrowLeftRight className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
+                <span>Roster Override Hub</span>
+              </button>
+            </>
           )}
 
           {onOpenAiChat && (
@@ -736,27 +861,29 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
           return (
             <div
               key={team.id}
-              className="glass-panel p-6 sm:p-8 pl-7 sm:pl-9 rounded-3xl border border-warm-700/60 space-y-6 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 hover:border-warm-500 shadow-2xl"
+              className="glass-panel p-6 sm:p-8 pl-7 sm:pl-9 rounded-3xl space-y-6 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 shadow-2xl"
               style={{
-                boxShadow: `0 16px 45px -10px ${team.color || '#d4622a'}45, 0 4px 20px -2px ${team.color || '#d4622a'}25`
+                borderColor: `${team.color || '#d4622a'}50`,
+                borderTop: `5px solid ${team.color || '#d4622a'}`,
+                borderLeft: `5px solid ${team.color || '#d4622a'}`,
+                background: `radial-gradient(ellipse 90% 75% at 0% 0%, ${team.color || '#d4622a'}28 0%, ${team.color || '#d4622a'}0c 45%, transparent 85%)`,
+                boxShadow: `0 20px 50px -10px ${team.color || '#d4622a'}45, 0 4px 20px -2px ${team.color || '#d4622a'}25`
               }}
             >
-              {/* 🌟 Unified Seamless Top-Left Curved Accent Ribbon */}
+              {/* 🌟 Top & Left Curved Accent Ribbon */}
               <div
                 className="absolute inset-0 pointer-events-none rounded-3xl transition-all duration-300"
                 style={{
-                  borderTop: `3px solid ${team.color || '#d4622a'}`,
-                  borderLeft: `3px solid ${team.color || '#d4622a'}`,
+                  borderTop: `4px solid ${team.color || '#d4622a'}`,
+                  borderLeft: `4px solid ${team.color || '#d4622a'}`,
                   borderTopLeftRadius: '1.5rem',
-                  boxShadow: `inset 2px 2px 18px -2px ${team.color || '#d4622a'}50, 0 0 24px -2px ${team.color || '#d4622a'}60`,
-                  maskImage: 'linear-gradient(135deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0) 70%)',
-                  WebkitMaskImage: 'linear-gradient(135deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0) 70%)'
+                  boxShadow: `inset 3px 3px 20px -3px ${team.color || '#d4622a'}50, 0 0 20px -2px ${team.color || '#d4622a'}40`,
                 }}
               />
 
-              {/* Ambient Corner Glow Halo */}
+              {/* Radiant Ambient Corner Glow Halo */}
               <div 
-                className="absolute -top-10 -left-10 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-35 transition-all duration-500 group-hover:opacity-60"
+                className="absolute -top-12 -left-12 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-60 transition-all duration-500 group-hover:opacity-85"
                 style={{
                   backgroundColor: team.color || '#d4622a'
                 }}
@@ -767,29 +894,29 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center space-x-4 min-w-0 flex-1">
                     <span
-                      className="text-4xl p-3.5 rounded-2xl border transition-all duration-300 shadow-lg shrink-0"
+                      className="text-4xl p-3.5 rounded-2xl border transition-all duration-300 shadow-xl shrink-0"
                       style={{
-                        backgroundColor: `${team.color || '#d4622a'}20`,
-                        borderColor: `${team.color || '#d4622a'}50`,
-                        boxShadow: `0 0 20px ${team.color || '#d4622a'}30`
+                        backgroundColor: `${team.color || '#d4622a'}30`,
+                        borderColor: `${team.color || '#d4622a'}80`,
+                        boxShadow: `0 0 25px ${team.color || '#d4622a'}45`
                       }}
                     >
                       {team.logo}
                     </span>
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex items-center gap-2.5 flex-wrap">
-                        <h3 className="text-2xl sm:text-3xl font-extrabold text-sand-100 tracking-tight font-sans flex items-center gap-2">
+                        <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-sand-100 tracking-tight font-sans flex items-center gap-2">
                           <span>{team.name}</span>
                         </h3>
                         
                         {/* High Visibility Team Color Ribbon Badge */}
                         <span
-                          className="px-3 py-1 rounded-full text-xs sm:text-sm font-black uppercase tracking-widest border font-mono shadow-sm"
+                          className="px-3.5 py-1 rounded-full text-xs sm:text-sm font-black uppercase tracking-widest border font-mono shadow-sm"
                           style={{
-                            backgroundColor: `${team.color || '#d4622a'}25`,
+                            backgroundColor: `${team.color || '#d4622a'}30`,
                             color: team.color || '#d4622a',
-                            borderColor: `${team.color || '#d4622a'}60`,
-                            boxShadow: `0 0 12px ${team.color || '#d4622a'}35`
+                            borderColor: `${team.color || '#d4622a'}70`,
+                            boxShadow: `0 0 14px ${team.color || '#d4622a'}40`
                           }}
                         >
                           {team.shortName}
@@ -800,7 +927,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                           <button
                             type="button"
                             onClick={() => openRenameModal(team)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-sky-800 dark:text-cyan-300 border border-cyan-500/40 text-xs font-bold transition cursor-pointer"
                             title={`Rename team "${team.name}" with custom name`}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -811,18 +938,18 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                       
                       {/* Captain & Theme Identity Highlight */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-300 text-xs sm:text-sm font-bold shadow-sm">
-                          <Crown className="w-4 h-4 text-amber-400" />
-                          <Zap className="w-3 h-3 text-cyan-300" />
-                          <span>Captain: <strong className="text-sand-100 font-extrabold">{captainInSquad ? captainInSquad.name : (team.owner || 'Unassigned')}</strong></span>
-                          <span className="text-[10px] text-amber-400 font-mono ml-0.5">(0 PTS)</span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs sm:text-sm font-bold shadow-sm">
+                          <Crown className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                          <Zap className="w-3 h-3 text-sky-600 dark:text-cyan-300" />
+                          <span>Captain: <strong className="text-slate-900 dark:text-sand-100 font-extrabold">{captainInSquad ? captainInSquad.name : (team.owner || 'Unassigned')}</strong></span>
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono ml-0.5">(0 PTS)</span>
                         </span>
 
                         <span
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs sm:text-sm font-mono font-bold"
                           style={{
-                            backgroundColor: `${team.color || '#d4622a'}15`,
-                            borderColor: `${team.color || '#d4622a'}40`,
+                            backgroundColor: `${team.color || '#d4622a'}20`,
+                            borderColor: `${team.color || '#d4622a'}50`,
                             color: team.color || '#d4622a'
                           }}
                         >
@@ -834,12 +961,34 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
-                    <span className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider ${isFull
-                        ? 'bg-cricket-emerald/20 text-cricket-emerald border border-cricket-emerald/40'
-                        : 'bg-[#c9a227]/20 text-[#c9a227] border border-[#c9a227]/40'
-                      }`}>
+                    <span 
+                      className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider border shadow-sm"
+                      style={{
+                        backgroundColor: isFull ? 'rgba(16, 185, 129, 0.2)' : `${team.color || '#d4622a'}25`,
+                        borderColor: isFull ? 'rgba(16, 185, 129, 0.5)' : `${team.color || '#d4622a'}60`,
+                        color: isFull ? '#047857' : (team.color || '#d4622a')
+                      }}
+                    >
                       {squad.length}/{maxCapacity}
                     </span>
+
+                    {/* Super Admin Direct Team Photo Upload */}
+                    {canManage && (
+                      <label
+                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/30 text-purple-700 dark:text-purple-300 border border-purple-500/35 transition cursor-pointer flex items-center gap-1.5 text-xs font-bold font-sans shadow-sm"
+                        title="Upload official team picture (Auto compressed ~30-50KB)"
+                      >
+                        <Camera className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span className="hidden sm:inline">Set Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleManualTeamPhotoUpload(e, team.id)}
+                          className="hidden"
+                          disabled={compressingPhoto}
+                        />
+                      </label>
+                    )}
 
                     {/* Super Admin Controls */}
                     {canManage && (
@@ -873,42 +1022,80 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                   </div>
                 </div>
 
+                {/* Official Generated Squad Photo Hero Preview if Set */}
+                {team.teamPhotoUrl && (
+                  <div className="relative rounded-2xl overflow-hidden border border-cyan-500/30 group/pic shadow-md mt-4">
+                    <img
+                      src={team.teamPhotoUrl}
+                      alt={`${team.name} Official Squad`}
+                      className="w-full h-36 sm:h-48 object-cover object-center group-hover/pic:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent flex items-end justify-between p-3">
+                      <span className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Official Team Picture</span>
+                      </span>
+
+                      {canManage && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-mono text-cyan-300 bg-slate-900/90 hover:bg-slate-800 px-2.5 py-1 rounded-lg border border-cyan-500/40 cursor-pointer shadow-sm">
+                            <span>Replace Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleManualTeamPhotoUpload(e, team.id)}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateTeamPhoto(team.id, '')}
+                            className="text-[10px] font-mono text-rose-400 bg-slate-900/90 hover:bg-red-950 px-2 py-1 rounded-lg border border-rose-500/40 cursor-pointer shadow-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Purse Stats with Modern Team Color Glow Shadow */}
                 <div 
-                  className="mt-6 bg-warm-950/75 p-5 rounded-2xl border space-y-3.5 transition-all duration-300 shadow-xl"
+                  className="mt-6 bg-[#f4efe6] dark:bg-warm-950/75 p-5 rounded-2xl border border-[#e2dacc] dark:border-warm-800/80 space-y-3.5 transition-all duration-300 shadow-lg"
                   style={{
-                    borderColor: `${team.color || '#d4622a'}35`,
-                    boxShadow: `0 10px 30px -6px ${team.color || '#d4622a'}30, inset 0 0 24px -10px ${team.color || '#d4622a'}20`
+                    borderColor: `${team.color || '#d4622a'}40`,
+                    boxShadow: `0 10px 30px -6px ${team.color || '#d4622a'}25, inset 0 0 24px -10px ${team.color || '#d4622a'}15`
                   }}
                 >
                   <div className="grid grid-cols-3 gap-3 text-center">
                     {[
-                      { label: 'Total Budget', value: `₹${team.totalPurse}`, color: 'text-sand-100' },
-                      { label: 'Spent Purse', value: `₹${team.spentPurse}`, color: 'text-rose-400' },
-                      { label: 'Remaining Purse', value: `₹${remainingPurse}`, color: 'text-emerald-400' },
+                      { label: 'Total Budget', value: `₹${team.totalPurse}`, color: 'text-slate-900 dark:text-sand-100' },
+                      { label: 'Spent Purse', value: `₹${team.spentPurse}`, color: 'text-rose-700 dark:text-rose-400' },
+                      { label: 'Remaining Purse', value: `₹${remainingPurse}`, color: 'text-emerald-700 dark:text-emerald-400' },
                     ].map((s, i) => (
-                      <div key={i} className={i > 0 ? 'border-l border-warm-800' : ''}>
-                        <span className="text-slate-400 text-xs uppercase font-bold tracking-wider block">{s.label}</span>
+                      <div key={i} className={i > 0 ? 'border-l border-[#d4ccbd] dark:border-warm-800' : ''}>
+                        <span className="text-slate-700 dark:text-slate-400 text-xs uppercase font-extrabold tracking-wider block">{s.label}</span>
                         <span className={`text-base sm:text-2xl font-black ${s.color} font-mono mt-0.5 block`}>{s.value}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="w-full bg-warm-900 h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-[#e2dacc] dark:bg-warm-900 h-2.5 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-400 to-amber-400 transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500"
                       style={{ width: `${Math.max(0, Math.min(100, (remainingPurse / team.totalPurse) * 100))}%` }}
                     />
                   </div>
 
                   {/* Release Player Action */}
                   {squad.filter(p => !p.isCaptain).length > 0 && (can('canBid') || canManage) && (
-                    <div className="pt-2.5 border-t border-warm-800/60 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-mono">
+                    <div className="pt-2.5 border-t border-[#d4ccbd] dark:border-warm-800/60 flex items-center justify-between">
+                      <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-400 font-mono font-bold">
                         Purse Refund Available:
                       </span>
                       <button
                         onClick={() => handleReleaseTopPlayer(team)}
-                        className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold tracking-wider uppercase transition shadow-sm cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-800 dark:text-rose-300 border border-rose-500/30 text-xs font-bold tracking-wider uppercase transition shadow-sm cursor-pointer"
                         title="Release highest bidded player back to auction pool to refund purse"
                       >
                         ⚡ Release Top Player
@@ -925,8 +1112,8 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                     { label: 'All-Rounders', count: allRoundersCount },
                     { label: 'WK', count: wkCount },
                   ].map(r => (
-                    <span key={r.label} className="px-3 py-1.5 rounded-xl bg-warm-900 border border-warm-700 text-sand-300 font-bold">
-                      {r.label}: <strong className="text-sand-100 font-extrabold">{r.count}</strong>
+                    <span key={r.label} className="px-3 py-1.5 rounded-xl bg-[#f4efe6] dark:bg-warm-900 border border-[#e2dacc] dark:border-warm-700 text-slate-800 dark:text-sand-300 font-bold">
+                      {r.label}: <strong className="text-slate-950 dark:text-sand-100 font-extrabold">{r.count}</strong>
                     </span>
                   ))}
                 </div>
@@ -969,17 +1156,22 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                         return (
                           <div
                             key={player.id}
-                            className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition group/item ${
+                            className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition group/item shadow-sm ${
                               isCap 
-                                ? 'bg-amber-950/25 border-amber-500/50 shadow-md ring-1 ring-amber-400/20'
-                                : 'bg-warm-900/80 border-warm-800/60 hover:border-warm-700'
+                                ? 'bg-amber-100/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500/60 shadow-md ring-1 ring-amber-400/30'
+                                : 'bg-white dark:bg-warm-900/80 border-[#e2dacc] dark:border-warm-800/80 hover:border-cyan-500/40'
                             }`}
                           >
                             <div className="flex items-center space-x-3.5 min-w-0 flex-1">
                               <div className="relative shrink-0">
-                                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border bg-warm-950 shadow-md ${
-                                  isCap ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-amber-400/20' : 'border-warm-700'
-                                }`}>
+                                <div 
+                                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border-2 bg-[#f4efe6] dark:bg-warm-950 shadow-md ${
+                                    isCap ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-amber-400/20' : ''
+                                  }`}
+                                  style={{
+                                    borderColor: isCap ? '#f59e0b' : `${team.color || '#d4622a'}80`
+                                  }}
+                                >
                                   <img
                                     src={player.avatarUrl || '/avatars/male.png'}
                                     alt={player.name}
@@ -1193,13 +1385,36 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                     </div>
                   </div>
 
-                  {/* Active Theme Indicator Bar */}
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 mt-2">
+                  {/* Active Theme Indicator Bar + Custom Hex Color Picker */}
+                  <div className="flex flex-wrap items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 mt-2 gap-2">
                     <div className="flex items-center gap-2.5">
-                      <span className="w-5 h-5 rounded-lg border border-white/40 shadow-sm shrink-0" style={{ backgroundColor: formData.color }} />
-                      <span className="text-xs font-bold text-slate-200 font-mono">Theme: {formData.color}</span>
+                      <label className="relative cursor-pointer" title="Pick custom color from color wheel">
+                        <input
+                          type="color"
+                          value={formData.color || '#3b82f6'}
+                          onChange={e => setFormData({ ...formData, color: e.target.value })}
+                          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                        />
+                        <span 
+                          className="w-7 h-7 rounded-lg border-2 border-white/60 shadow-md block hover:scale-105 transition" 
+                          style={{ backgroundColor: formData.color || '#3b82f6' }} 
+                        />
+                      </label>
+                      <div>
+                        <span className="text-xs font-bold text-slate-200 font-mono block">Color: {formData.color}</span>
+                        <span className="text-[10px] text-slate-400 font-sans">Tap swatch for custom spectrum picker</span>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-mono text-cyan-300">Active Identity</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={formData.color || ''}
+                        onChange={e => setFormData({ ...formData, color: e.target.value })}
+                        placeholder="#3b82f6"
+                        maxLength={7}
+                        className="w-24 bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-xs px-2.5 py-1 rounded-lg uppercase focus:outline-none focus:border-cyan-400 font-bold"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1330,6 +1545,78 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                     </div>
                   </div>
 
+                  {/* Official Team Squad Photo (Compressed HD) */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-sand-200 flex items-center gap-2 font-sans">
+                        <Camera className="w-4 h-4 text-cyan-400" />
+                        <span>Official Team Squad Picture</span>
+                      </label>
+                      {photoInfo && (
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/30 font-bold">
+                          {photoInfo}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      {/* Image Preview Thumbnail */}
+                      <div className="w-24 h-16 sm:w-28 sm:h-18 rounded-xl bg-warm-900 border border-warm-700 overflow-hidden flex items-center justify-center shrink-0 shadow-inner relative group">
+                        {formData.teamPhotoUrl ? (
+                          <img
+                            src={formData.teamPhotoUrl}
+                            alt="Team Squad Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-center text-slate-500 text-[10px] p-1 font-mono">
+                            <ImageIcon className="w-5 h-5 mx-auto opacity-50 mb-0.5" />
+                            <span>No Photo</span>
+                          </div>
+                        )}
+                        {compressingPhoto && (
+                          <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                            <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Upload & Clear Controls */}
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-sky-800 dark:text-cyan-300 border border-cyan-500/40 text-xs font-bold font-sans cursor-pointer transition flex items-center gap-1.5 shadow-sm">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{compressingPhoto ? 'Compressing…' : 'Upload Compressed Picture'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleManualTeamPhotoUpload(e)}
+                              className="hidden"
+                              disabled={compressingPhoto}
+                            />
+                          </label>
+
+                          {formData.teamPhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, teamPhotoUrl: '' }));
+                                setPhotoInfo('');
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-rose-400 border border-red-500/30 text-xs font-bold font-sans transition cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <p className="text-[10px] text-slate-400 font-sans">
+                          Auto-compresses high-res team photos to lightweight ~30-50 KB for quick loading.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
 
               </div>
@@ -1425,7 +1712,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="warm-card w-full max-w-2xl p-6 sm:p-7 rounded-3xl border border-cyan-500/40 space-y-5 shadow-2xl relative">
             <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
-              <h3 className="text-lg font-bold text-sand-100 flex items-center gap-2 font-display">
+              <h3 className="text-lg font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
                 <ArrowLeftRight className="w-5 h-5 text-cyan-400" />
                 <span>⇄ Super Admin: Swap Player</span>
               </h3>
@@ -1524,7 +1811,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="warm-card w-full max-w-xl p-6 sm:p-7 rounded-3xl border border-blue-500/40 space-y-5 shadow-2xl relative">
             <div className="flex items-center justify-between border-b border-blue-500/20 pb-3">
-              <h3 className="text-lg font-bold text-sand-100 flex items-center gap-2 font-display">
+              <h3 className="text-lg font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
                 <ArrowRight className="w-5 h-5 text-blue-400" />
                 <span>→ Super Admin: Transfer Player</span>
               </h3>
@@ -1592,7 +1879,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="warm-card w-full max-w-2xl p-6 sm:p-7 rounded-3xl border border-emerald-500/40 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
-              <h3 className="text-lg font-bold text-sand-100 flex items-center gap-2 font-display">
+              <h3 className="text-lg font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
                 <UserPlus className="w-5 h-5 text-emerald-400" />
                 <span>+ Add Player to {addPlayerModal.team.name}</span>
               </h3>
@@ -1703,137 +1990,356 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
       {/* ── 4. Super Admin Roster Override & Player Swapper Hub Modal ── */}
       {rosterHubOpen && canManage && createPortal(
-        <div className="fixed inset-0 z-[100] bg-warm-950/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="warm-card w-full max-w-6xl p-6 sm:p-8 rounded-3xl border border-cyan-500/50 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto my-auto">
-            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4">
-              <div>
-                <h3 className="text-2xl font-black text-sand-100 flex items-center gap-2 font-display">
-                  <Sliders className="w-6 h-6 text-cyan-400" />
+        <div className="fixed inset-0 z-[100] bg-black/80 dark:bg-warm-950/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in">
+          <div className="warm-card w-full max-w-[96vw] 2xl:max-w-[1750px] p-4 sm:p-6 md:p-8 rounded-3xl border border-cyan-500/50 space-y-4 sm:space-y-6 shadow-2xl relative h-[94vh] max-h-[96vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-cyan-500/25 pb-4 shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-sand-100 flex items-center gap-2.5 font-sans tracking-tight">
+                  <Sliders className="w-6 h-6 sm:w-7 sm:h-7 text-cyan-500 dark:text-cyan-400 shrink-0" />
                   <span>⚡ Super Admin Roster Override & Swapper Hub</span>
                 </h3>
-                <p className="text-xs text-sand-400 mt-1">
-                  Manage, swap, reassign, and override team members across all {teams.length} teams at any time without an auction.
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-sand-400 mt-1 font-sans">
+                  Autonomous tournament roster manager — Instant player swaps, squad transfers, and direct team assignments without auction.
                 </p>
               </div>
-              <button
-                onClick={() => setRosterHubOpen(false)}
-                className="p-2 rounded-xl text-sand-400 hover:text-sand-100 bg-warm-900 border border-warm-700 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              {/* Header Right Actions: Search & Quick Counts & Close */}
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                {/* Search Bar */}
+                <div className="relative min-w-[220px] sm:min-w-[280px]">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search player in rosters…"
+                    value={rosterHubSearch}
+                    onChange={e => setRosterHubSearch(e.target.value)}
+                    className="w-full bg-[#f4efe6] dark:bg-warm-900 border border-[#e2dacc] dark:border-warm-700 rounded-xl pl-10 pr-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-sand-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-medium"
+                  />
+                  {rosterHubSearch && (
+                    <button
+                      onClick={() => setRosterHubSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Count Pill */}
+                <div className="hidden xl:flex items-center gap-2 bg-[#f4efe6] dark:bg-warm-900/90 px-3.5 py-2 rounded-xl border border-[#e2dacc] dark:border-warm-700 text-xs font-mono font-bold text-slate-700 dark:text-sand-300">
+                  <span>{teams.length} Teams</span>
+                  <span>·</span>
+                  <span className="text-emerald-700 dark:text-emerald-400">
+                    {teams.reduce((sum, t) => sum + (t.squad?.length || 0), 0)} Squad Members
+                  </span>
+                  <span>·</span>
+                  <span className="text-amber-700 dark:text-amber-400">
+                    {players.filter(p => p.status !== 'sold' && !teams.some(t => t.captainId === p.id)).length} Free Pool
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setRosterHubOpen(false)}
+                  className="p-2 sm:p-2.5 rounded-xl text-slate-500 hover:text-slate-900 dark:text-sand-400 dark:hover:text-sand-100 bg-[#f4efe6] dark:bg-warm-900 border border-[#e2dacc] dark:border-warm-700 cursor-pointer transition shadow-sm"
+                  title="Close Swapper Hub"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Quick Actions Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teams.map(team => {
-                const squad = team.squad || [];
-                return (
-                  <div
-                    key={team.id}
-                    className="p-4 rounded-2xl bg-warm-900/90 border border-warm-700 space-y-3"
-                    style={{ borderTop: `4px solid ${team.color || '#00f2fe'}` }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-extrabold text-sand-100 text-sm font-sans flex items-center gap-2">
-                        <span>{team.logo}</span>
-                        <span>{team.name}</span>
-                      </h4>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-warm-950 text-cyan-300 border border-cyan-500/30">
-                        {squad.length} Players
-                      </span>
+            {/* ── Super Admin Squad Size / Team Members Controller ── */}
+            {(() => {
+              const activeNeplPoolCount = players.filter(p => p.isPlayingNEPL !== false).length;
+              const suggestedSquadLimit = teams.length > 0 ? Math.max(1, Math.floor(activeNeplPoolCount / teams.length)) : 10;
+              
+              return (
+                <div className="bg-[#e9e3d5] dark:bg-warm-950/80 p-3.5 sm:p-4 rounded-2xl border border-[#d4ccbd] dark:border-cyan-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shrink-0 shadow-inner">
+                  <div className="flex items-center gap-3">
+                    <span className="p-2.5 rounded-2xl bg-cyan-500/20 text-sky-800 dark:text-cyan-300 font-black text-base shadow-sm">
+                      👥
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-sand-100">
+                          Team Member Limit (Squad Size)
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-sky-800 dark:text-cyan-300 border border-cyan-500/30">
+                          Super Admin
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                        Available Pool: <strong className="text-slate-900 dark:text-sand-200">{activeNeplPoolCount} players</strong> ÷ <strong className="text-slate-900 dark:text-sand-200">{teams.length} teams</strong> = <strong className="text-emerald-700 dark:text-emerald-400">{suggestedSquadLimit} members/team suggested</strong>.
+                      </p>
                     </div>
+                  </div>
 
-                    {/* Squad Members */}
-                    <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                      {[...squad].sort((a, b) => {
-                        const aIsCap = Boolean(a.isCaptain || (team.captainId && String(a.id) === String(team.captainId)));
-                        const bIsCap = Boolean(b.isCaptain || (team.captainId && String(b.id) === String(team.captainId)));
-                        if (aIsCap && !bIsCap) return -1;
-                        if (!aIsCap && bIsCap) return 1;
-                        return 0;
-                      }).map(p => {
-                        const isCap = Boolean(p.isCaptain || (team.captainId && String(p.id) === String(team.captainId)));
-                        return (
-                        <div
-                          key={p.id}
-                          className={`flex items-center justify-between p-2 rounded-xl border text-xs ${
-                            isCap
-                              ? 'bg-amber-950/30 border-amber-500/50 shadow-sm'
-                              : 'bg-warm-950/60 border-warm-800/80'
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-sand-300">Set All Teams:</span>
+                    {[8, 10, 11, 12, 14, 15, 16, 18, 20].map(size => {
+                      const allHaveThis = teams.length > 0 && teams.every(t => (t.maxSquadSize || 10) === size);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => handleUpdateAllSquadSizes(size)}
+                          className={`px-2.5 py-1 rounded-xl font-mono text-xs font-black transition cursor-pointer shadow-sm ${
+                            allHaveThis
+                              ? 'bg-cyan-500 text-slate-950 ring-2 ring-cyan-400 shadow-md'
+                              : 'bg-[#f4efe6] dark:bg-warm-900 text-slate-800 dark:text-sand-200 border border-[#d4ccbd] dark:border-warm-700 hover:border-cyan-400'
                           }`}
+                          title={`Set all teams max capacity to ${size} members`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[10px]">{isCap ? '👑' : '🏏'}</span>
-                            <div className="min-w-0 truncate">
-                              <span className="font-bold text-sand-200 block truncate flex items-center gap-1">
-                                <span>{p.name}</span>
-                                {isCap && (
-                                  <span className="px-1 py-0.2 rounded text-[7px] font-black uppercase bg-amber-500/25 text-amber-300 border border-amber-500/40">
-                                    Cap
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-[9px] text-sand-500 block truncate">{p.role} • {p.category || 'Male'}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0 ml-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRosterHubOpen(false);
-                                handleQuickSwap(team, p);
-                              }}
-                              className="p-1 rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 text-[10px] cursor-pointer"
-                              title="⇄ Swap"
-                            >
-                              <ArrowLeftRight className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRosterHubOpen(false);
-                                handleQuickTransfer(team, p);
-                              }}
-                              className="p-1 rounded bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 text-[10px] cursor-pointer"
-                              title="→ Transfer"
-                            >
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSquadPlayer(team, p)}
-                              className="p-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px] cursor-pointer"
-                              title="✕ Remove"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
+                          {size}
+                        </button>
                       );
-                      })}
-                    </div>
+                    })}
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setRosterHubOpen(false);
-                        handleQuickAddPlayer(team);
-                      }}
-                      className="w-full py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition cursor-pointer"
+                      onClick={() => handleUpdateAllSquadSizes(suggestedSquadLimit)}
+                      className="px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
+                      title={`Auto-set all teams to ${suggestedSquadLimit} members based on ${activeNeplPoolCount} available players`}
                     >
-                      + Add Free Player
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Auto ({suggestedSquadLimit})</span>
                     </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Quick Actions Grid - 2 Teams per Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-y-auto p-1 pr-2">
+              {teams.map(team => {
+                const squad = team.squad || [];
+                const maxCap = team.maxSquadSize || 10;
+                const isFull = squad.length >= maxCap;
+                const searchLower = rosterHubSearch.trim().toLowerCase();
+                const filteredSquad = searchLower
+                  ? squad.filter(p => 
+                      p.name.toLowerCase().includes(searchLower) || 
+                      (p.role && p.role.toLowerCase().includes(searchLower)) ||
+                      (p.category && p.category.toLowerCase().includes(searchLower))
+                    )
+                  : squad;
+
+                return (
+                  <div
+                    key={team.id}
+                    className="p-4 sm:p-5 rounded-3xl bg-[#f4efe6] dark:bg-warm-900/90 border border-[#e2dacc] dark:border-warm-700/80 space-y-3.5 shadow-lg flex flex-col justify-between"
+                    style={{ borderTop: `5px solid ${team.color || '#00f2fe'}` }}
+                  >
+                    {/* Team Header Tile */}
+                    <div>
+                      <div className="flex items-center justify-between border-b border-[#e2dacc] dark:border-warm-800/60 pb-3 gap-2">
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <span className="text-2xl p-1.5 rounded-xl bg-white dark:bg-warm-950 border border-[#e2dacc] dark:border-warm-800 shadow-sm shrink-0">
+                            {team.logo || '🏏'}
+                          </span>
+                          <div className="min-w-0">
+                            <h4 className="font-black text-slate-900 dark:text-sand-100 text-base sm:text-lg font-sans truncate">
+                              {team.name}
+                            </h4>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 font-sans truncate">
+                              👑 Cap: <span className="text-amber-700 dark:text-amber-400 font-bold">{team.captainName || team.owner || 'TBD'}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Per-team Stepper & Status Badge & Compressed Photo Upload */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          {canManage && (
+                            <label
+                              className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/30 text-purple-700 dark:text-purple-300 border border-purple-500/35 transition cursor-pointer flex items-center gap-1 text-xs font-bold font-sans shadow-sm"
+                              title="Upload official team picture (Auto compressed ~30-50KB)"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                              <span className="hidden sm:inline">Photo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleManualTeamPhotoUpload(e, team.id)}
+                                className="hidden"
+                                disabled={compressingPhoto}
+                              />
+                            </label>
+                          )}
+
+                          <div className="flex items-center gap-1 bg-white dark:bg-warm-950 px-2 py-1 rounded-xl border border-[#d4ccbd] dark:border-warm-800 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateSingleTeamSquadSize(team.id, Math.max(1, maxCap - 1))}
+                              className="w-5 h-5 rounded flex items-center justify-center text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-[#e2dacc] dark:hover:bg-warm-800 transition cursor-pointer"
+                              title="Decrease team capacity by 1"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-mono font-black text-slate-900 dark:text-sand-100 px-1">
+                              {squad.length}/{maxCap}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateSingleTeamSquadSize(team.id, maxCap + 1)}
+                              className="w-5 h-5 rounded flex items-center justify-center text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-[#e2dacc] dark:hover:bg-warm-800 transition cursor-pointer"
+                              title="Increase team capacity by 1"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border shadow-sm shrink-0 ${
+                            isFull
+                              ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40'
+                              : 'bg-white dark:bg-warm-950 text-sky-800 dark:text-cyan-300 border-[#d4ccbd] dark:border-cyan-500/30'
+                          }`}>
+                            {isFull ? 'Full' : `${maxCap - squad.length} Open`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Squad Members List - Bigger & Taller */}
+                      <div className="space-y-2.5 max-h-[460px] sm:max-h-[520px] overflow-y-auto pr-1.5 mt-3.5">
+                        {filteredSquad.length === 0 && searchLower ? (
+                          <div className="p-4 text-center text-xs text-slate-500 font-mono">
+                            No squad player matches "{rosterHubSearch}"
+                          </div>
+                        ) : filteredSquad.length === 0 ? (
+                          <div className="p-6 text-center text-xs text-slate-500 font-mono bg-white/50 dark:bg-warm-950/40 rounded-2xl border border-dashed border-[#d4ccbd] dark:border-warm-800">
+                            Squad is currently empty. Click below to add players.
+                          </div>
+                        ) : null}
+
+                        {[...filteredSquad].sort((a, b) => {
+                          const aIsCap = Boolean(a.isCaptain || (team.captainId && String(a.id) === String(team.captainId)));
+                          const bIsCap = Boolean(b.isCaptain || (team.captainId && String(b.id) === String(team.captainId)));
+                          if (aIsCap && !bIsCap) return -1;
+                          if (!aIsCap && bIsCap) return 1;
+                          return 0;
+                        }).map(p => {
+                          const isCap = Boolean(p.isCaptain || (team.captainId && String(p.id) === String(team.captainId)));
+                          const fullPlayerData = players.find(pl => pl.id === p.id) || p;
+                          
+                          return (
+                            <div
+                              key={p.id}
+                              className={`flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 shadow-sm gap-2.5 ${
+                                isCap
+                                  ? 'bg-amber-100/70 dark:bg-amber-950/35 border-amber-400 dark:border-amber-500/60 ring-1 ring-amber-400/30'
+                                  : 'bg-white dark:bg-warm-950/70 border-[#e2dacc] dark:border-warm-800/80 hover:border-cyan-500/40'
+                              }`}
+                            >
+                              {/* Player Avatar + Info */}
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="relative shrink-0">
+                                  <img
+                                    src={fullPlayerData.avatarUrl || p.avatarUrl || '/avatars/male.png'}
+                                    alt={p.name}
+                                    className={`w-11 h-11 rounded-xl object-cover border shadow-sm ${
+                                      isCap ? 'border-amber-400 ring-1 ring-amber-400/40' : 'border-[#d4ccbd] dark:border-warm-700'
+                                    }`}
+                                    onError={e => { e.target.src = '/avatars/male.png'; }}
+                                  />
+                                  {isCap && (
+                                    <span className="absolute -top-1 -right-1 p-0.5 bg-amber-400 text-slate-950 rounded-full shadow z-10">
+                                      <Crown className="w-3 h-3" />
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <h5 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-sand-100 truncate">
+                                      {p.name}
+                                    </h5>
+                                    {isCap && (
+                                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/40 shrink-0">
+                                        Cap
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                    <span className="text-xs font-bold text-sky-700 dark:text-cyan-300 truncate">{p.role}</span>
+                                    <span className="text-slate-400 text-xs font-mono">•</span>
+                                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">{p.category || 'Male'}</span>
+                                  </div>
+                                  <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 mt-0.5">
+                                    🏏 {fullPlayerData.runs ?? 0} runs · 🎯 {fullPlayerData.wickets ?? 0} wkts · ⚡ SR {fullPlayerData.strikeRate ?? '-'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRosterHubOpen(false);
+                                    handleQuickSwap(team, p);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/35 text-sky-800 dark:text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-sm"
+                                  title={`Swap ${p.name} with another team player`}
+                                >
+                                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Swap</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRosterHubOpen(false);
+                                    handleQuickTransfer(team, p);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/35 text-blue-800 dark:text-blue-300 border border-blue-500/30 text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-sm"
+                                  title={`Transfer ${p.name} to another team`}
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Transfer</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSquadPlayer(team, p)}
+                                  className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-xs font-bold transition cursor-pointer shadow-sm"
+                                  title={`Remove ${p.name} from squad`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Add Free Player CTA */}
+                    <div className="pt-3 border-t border-[#e2dacc] dark:border-warm-800/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRosterHubOpen(false);
+                          handleQuickAddPlayer(team);
+                        }}
+                        className="w-full py-2.5 sm:py-3 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 text-xs sm:text-sm font-extrabold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>+ Add Free Player to Squad</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-warm-800">
+            {/* Modal Footer */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#e2dacc] dark:border-warm-800 shrink-0">
+              <span className="text-xs text-slate-600 dark:text-sand-400 font-mono">
+                💡 Tip: Changes update team squads immediately across live scores, fixtures, and standings.
+              </span>
               <button
                 type="button"
                 onClick={() => setRosterHubOpen(false)}
-                className="btn-primary text-xs px-6 py-2.5 cursor-pointer font-bold"
+                className="btn-primary text-xs sm:text-sm px-6 py-2.5 cursor-pointer font-bold shadow-md self-end"
               >
                 Done / Close Hub
               </button>
@@ -1853,7 +2359,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                   {renameModal.team.logo}
                 </span>
                 <div>
-                  <h3 className="text-xl font-black text-sand-100 flex items-center gap-2 font-display">
+                  <h3 className="text-xl font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
                     <Edit3 className="w-5 h-5 text-cyan-400" />
                     <span>Override Team Name</span>
                   </h3>

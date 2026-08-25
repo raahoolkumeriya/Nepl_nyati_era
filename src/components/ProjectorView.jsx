@@ -307,13 +307,17 @@ export default function ProjectorView({
         
         {/* Branding */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 text-slate-950 flex items-center justify-center font-bold shadow-[0_0_20px_rgba(0,242,254,0.4)]">
-            <Gavel className="w-6 h-6 transform -rotate-45" />
+          <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white p-1 border border-cyan-500/40 shadow-[0_0_20px_rgba(0,242,254,0.4)] shrink-0 flex items-center justify-center">
+            <img
+              src="/nyati_era_logo.png"
+              alt="Nyati Era"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight gradient-text-brand font-sans">
-                Nyati Era Premier League 2026+
+                Nyati Era Premier League {new Date().getFullYear()}
               </h1>
               <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-serif font-bold shadow-[0_0_12px_rgba(121,40,202,0.3)]">
                 कर्मण्येवाधिकारस्ते
@@ -849,7 +853,7 @@ export default function ProjectorView({
           </div>
 
           <div className="text-slate-500 text-[11px] hidden md:block">
-            Nyati Era Box Cricket League 2026+
+            Nyati Era Box Cricket League {new Date().getFullYear()}
           </div>
         </div>
       </div>

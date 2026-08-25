@@ -53,41 +53,37 @@ export default function Header({
   const tabs = allTabs.filter(t => can(t.permission));
 
   return (
-    <header className="sticky top-0 z-40 bg-[#141413]/90 backdrop-blur-xl border-b border-stone-800/80 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
-      <div className="max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-40 bg-[#141413]/90 backdrop-blur-xl border-b border-stone-800/80 shadow-[0_4px_25px_rgba(0,0,0,0.35)]">
+      <div className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
+        <div className="flex items-center justify-between min-h-[72px] sm:min-h-[80px] py-2">
           
           {/* ── Logo & Branding ── */}
           <div 
-            className="flex items-center space-x-2.5 cursor-pointer group shrink-0" 
+            className="flex items-center space-x-3 cursor-pointer group shrink-0" 
             onClick={() => setActiveTab(tabs[0]?.id || 'auction')}
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#cc785c] via-[#e07a5f] to-[#d97706] p-[1.5px] shadow-[0_2px_12px_rgba(204,120,92,0.3)] group-hover:shadow-[0_4px_18px_rgba(204,120,92,0.45)] transition-all duration-200 shrink-0">
-              <div className="w-full h-full bg-[#141413] rounded-[10px] flex items-center justify-center">
-                <Gavel className="w-4 h-4 text-[#cc785c] transform -rotate-45 group-hover:scale-110 transition-transform" />
-              </div>
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-white/95 dark:bg-white p-1 border-2 border-[#cc785c]/40 shadow-[0_4px_16px_rgba(204,120,92,0.35)] group-hover:scale-105 group-hover:shadow-[0_6px_22px_rgba(204,120,92,0.5)] transition-all duration-200 shrink-0 flex items-center justify-center">
+              <img
+                src="/nyati_era_logo.png"
+                alt="Nyati Era Official Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-sm sm:text-base font-extrabold tracking-tight gradient-text-brand font-sans leading-none">
+                <h1 className="text-lg sm:text-2xl font-black tracking-tight gradient-text-brand font-sans leading-tight">
                   Nyati Era
                 </h1>
-                <span className="hidden sm:inline-flex px-2 py-0.2 text-[9px] font-bold tracking-wider uppercase rounded-full bg-[#cc785c]/10 text-[#cc785c] border border-[#cc785c]/25 font-sans">
-                  2026+
-                </span>
-                <span className="hidden xl:inline-flex px-2 py-0.2 text-[9px] font-semibold rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25 font-serif italic">
-                  कर्मण्येवाधिकारस्ते
-                </span>
               </div>
-              <p className="text-[10px] text-stone-400 flex items-center gap-1.5 font-medium mt-0.5">
-                Box Cricket League
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <p className="text-xs sm:text-sm text-stone-300 dark:text-stone-300 light:text-stone-800 flex items-center gap-2 font-extrabold uppercase tracking-wider mt-0.5">
+                <span>Box Cricket League</span>
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
               </p>
             </div>
           </div>
 
           {/* ── Center Anthropic Navigation ── */}
-          <nav className="hidden lg:flex items-center space-x-1 bg-[#1c1b1a]/90 p-1 rounded-xl border border-stone-800 shadow-sm mx-2">
+          <nav className="hidden lg:flex items-center space-x-1.5 bg-[#1c1b1a]/95 p-1.5 rounded-2xl border border-stone-800 shadow-md mx-3">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -95,13 +91,13 @@ export default function Header({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer ${
                     isActive
-                      ? 'bg-[#faf9f5] text-[#141413] shadow-sm font-bold scale-[1.01]'
+                      ? 'bg-[#faf9f5] text-[#141413] shadow-md font-black scale-[1.02]'
                       : 'text-stone-400 hover:text-[#faf9f5] hover:bg-stone-800/60'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#141413]' : 'text-stone-400'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#141413]' : 'text-stone-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -258,42 +254,6 @@ export default function Header({
               </div>
             )}
           </div>
-        </div>
-
-        {/* ── Mobile Cyber Tab Bar + Theme Switcher ── */}
-        <div className="flex lg:hidden items-center justify-between py-2.5 border-t border-cyan-500/15 gap-2">
-          <div className="flex overflow-x-auto space-x-2 no-scrollbar py-0.5">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs whitespace-nowrap font-display font-semibold transition ${
-                    isActive
-                      ? 'bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 shadow-[0_0_15px_rgba(0,242,254,0.4)]'
-                      : 'bg-slate-900 text-slate-400 border border-slate-800'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={toggleTheme}
-            className={`p-2 rounded-xl border shrink-0 transition ${
-              isDark
-                ? 'bg-slate-900 text-amber-300 border-amber-500/30'
-                : 'bg-white text-slate-800 border-slate-300'
-            }`}
-            title="Toggle Dark / White Theme"
-          >
-            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
-          </button>
         </div>
       </div>
 

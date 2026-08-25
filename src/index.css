@@ -16,6 +16,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -26,7 +28,15 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
   transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mobile App Native Touch Target & Feedback */
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -81,22 +91,22 @@ body {
 html.light, body.light {
   color-scheme: light;
   background-color: #faf9f5;
-  color: #141413;
+  color: #0f172a;
 }
 
 html.light body {
   background-color: #faf9f5;
-  color: #141413;
+  color: #0f172a;
 }
 
 .light ::selection {
-  background: rgba(204, 120, 92, 0.22);
-  color: #141413;
+  background: rgba(204, 120, 92, 0.25);
+  color: #0f172a;
 }
 
 .light .theme-root-container {
   background-color: #faf9f5 !important;
-  color: #141413 !important;
+  color: #0f172a !important;
   background-image: 
     radial-gradient(at 0% 0%, rgba(204, 120, 92, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(217, 119, 6, 0.04) 0px, transparent 50%),
@@ -106,12 +116,12 @@ html.light body {
 
 /* Anthropic Light Mode Cards & Surfaces */
 .light .glass-panel {
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid #e2dacc !important;
-  box-shadow: 0 4px 12px -2px rgba(20, 20, 19, 0.03), 0 20px 30px -10px rgba(20, 20, 19, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
-  color: #141413 !important;
+  box-shadow: 0 4px 16px -2px rgba(20, 20, 19, 0.04), 0 20px 30px -10px rgba(20, 20, 19, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  color: #0f172a !important;
 }
 
 .light .glass-card {
@@ -119,8 +129,8 @@ html.light body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid #e2dacc !important;
-  box-shadow: 0 2px 8px -2px rgba(20, 20, 19, 0.04), 0 12px 24px -6px rgba(20, 20, 19, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
-  color: #141413 !important;
+  box-shadow: 0 2px 10px -2px rgba(20, 20, 19, 0.05), 0 12px 24px -6px rgba(20, 20, 19, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  color: #0f172a !important;
 }
 
 .light .warm-card, .light .neon-card {
@@ -128,8 +138,8 @@ html.light body {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid #e2dacc !important;
-  box-shadow: 0 20px 40px -10px rgba(20, 20, 19, 0.07), 0 1px 3px 0 rgba(20, 20, 19, 0.04) !important;
-  color: #141413 !important;
+  box-shadow: 0 20px 40px -10px rgba(20, 20, 19, 0.08), 0 1px 3px 0 rgba(20, 20, 19, 0.04) !important;
+  color: #0f172a !important;
 }
 
 .light .glass-card-hover:hover {
@@ -140,109 +150,125 @@ html.light body {
 
 /* Header & Nav in Anthropic Light Mode */
 .light header {
-  background: rgba(250, 249, 245, 0.94) !important;
+  background: rgba(250, 249, 245, 0.96) !important;
   border-bottom: 1px solid #e2dacc !important;
   box-shadow: 0 4px 20px -2px rgba(20, 20, 19, 0.04) !important;
 }
 
 .light header nav {
-  background: #e2dacc !important;
-  border: 1px solid #d4ccbd !important;
+  background: #f4efe6 !important;
+  border: 1px solid #e2dacc !important;
 }
 
-/* Light Mode Sub-Surfaces & Boxes (#e2dacc) */
-.light .bg-warm-950, .light .bg-slate-950, .light .bg-stone-950 {
-  background-color: #e2dacc !important;
-  border-color: #d4ccbd !important;
-  color: #141413 !important;
-}
-
-.light .bg-warm-900, .light .bg-slate-900, .light .bg-stone-900, 
-.light .bg-\[\#0b1120\], .light .bg-\[\#070b14\], .light .bg-\[\#0d1627\], .light .bg-\[\#101b33\] {
-  background-color: #e2dacc !important;
-  border-color: #d4ccbd !important;
-  color: #141413 !important;
-}
-
-.light .bg-warm-900\/60, .light .bg-warm-900\/80, .light .bg-slate-900\/90, .light .bg-\[\#070b14\]\/70, .light .bg-\[\#070b14\]\/50 {
-  background-color: #ffffff !important;
+/* Light Mode Sub-Surfaces & Stats Boxes (Soft Cream Paper with Crisp Borders) */
+.light .bg-warm-950, .light .bg-slate-950, .light .bg-stone-950,
+.light .bg-warm-900, .light .bg-slate-900, .light .bg-stone-900,
+.light .bg-warm-850, .light .bg-slate-850, .light .bg-warm-800, .light .bg-slate-800, .light .bg-stone-800,
+.light .bg-\[\#0b1120\], .light .bg-\[\#070b14\], .light .bg-\[\#050811\], .light .bg-\[\#0d1627\], .light .bg-\[\#101b33\], .light .bg-\[\#1c1b1a\],
+.light [class*="bg-warm-950/"], .light [class*="bg-warm-900/"], .light [class*="bg-warm-800/"],
+.light [class*="bg-slate-950/"], .light [class*="bg-slate-900/"], .light [class*="bg-slate-850/"], .light [class*="bg-slate-800/"],
+.light [class*="bg-stone-950/"], .light [class*="bg-stone-900/"],
+.light [class*="bg-[#070b14]/"], .light [class*="bg-[#0b1120]/"], .light [class*="bg-[#050811]/"] {
+  background-color: #f4efe6 !important;
   border-color: #e2dacc !important;
-  color: #141413 !important;
+  color: #0f172a !important;
 }
 
-.light .bg-warm-850, .light .bg-slate-850, .light .bg-warm-800, .light .bg-slate-800, .light .bg-stone-800, .light .bg-\[\#1c1b1a\] {
-  background-color: #e2dacc !important;
-  border-color: #d4ccbd !important;
-  color: #141413 !important;
+.light .bg-purple-950, .light [class*="bg-purple-950/"] {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+  color: #581c87 !important;
 }
 
-.light .bg-purple-950, .light .bg-purple-950\/20, .light .bg-purple-950\/30, .light .bg-cyan-950\/30 {
-  background-color: #e2dacc !important;
-  border-color: #d4ccbd !important;
-  color: #141413 !important;
+.light .bg-cyan-950, .light [class*="bg-cyan-950/"] {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+  color: #0c4a6e !important;
+}
+
+.light .bg-amber-950, .light [class*="bg-amber-950/"] {
+  background-color: #fefce8 !important;
+  border-color: #fde68a !important;
+  color: #78350f !important;
+}
+
+.light .bg-emerald-950, .light [class*="bg-emerald-950/"] {
+  background-color: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+  color: #064e3b !important;
+}
+
+.light .bg-rose-950, .light [class*="bg-rose-950/"] {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #881337 !important;
 }
 
 /* Modals & Backdrop in Light Mode */
-.light .bg-black\/80, .light .bg-warm-950\/90, .light .bg-slate-950\/80 {
-  background-color: rgba(20, 20, 19, 0.45) !important;
-  backdrop-filter: blur(8px) !important;
+.light .bg-black\/80, .light .bg-warm-950\/90, .light .bg-slate-950\/80, .light .bg-\[\#070b14\]\/90, .light .bg-\[\#070b14\]\/95, .light .bg-\[\#070b14\]\/98 {
+  background-color: rgba(20, 20, 19, 0.55) !important;
+  backdrop-filter: blur(10px) !important;
 }
 
 /* Inputs & Form Controls in Anthropic Light Mode */
 .light .warm-input, .light .cyber-input, .light input, .light select, .light textarea {
   background-color: #ffffff !important;
-  border: 1px solid #e2dacc !important;
-  color: #141413 !important;
+  border: 1px solid #d4ccbd !important;
+  color: #0f172a !important;
+  font-weight: 600;
 }
 
 .light input::placeholder, .light textarea::placeholder {
-  color: #8c887b !important;
+  color: #64748b !important;
+  font-weight: 500;
 }
 
 .light .warm-input:focus, .light .cyber-input:focus, .light input:focus, .light select:focus, .light textarea:focus {
   background-color: #ffffff !important;
   border-color: #cc785c !important;
-  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.2) !important;
+  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.25) !important;
 }
 
 /* Anthropic High-Contrast Typography Hierarchy in Light Mode */
 .light h1, .light h2, .light h3, .light h4, .light h5, .light h6 {
-  color: #141413 !important;
+  color: #0f172a !important;
 }
 
 .light .text-sand-100, .light .text-slate-100, .light .text-white {
-  color: #141413 !important;
+  color: #0f172a !important;
 }
 
 .light .text-sand-200, .light .text-slate-200 {
-  color: #2a2927 !important;
+  color: #1e293b !important;
 }
 
 .light .text-sand-300, .light .text-slate-300 {
-  color: #474540 !important;
+  color: #334155 !important;
 }
 
 .light .text-sand-400, .light .text-sand-500, .light .text-slate-400, .light .text-slate-500 {
-  color: #6e6b63 !important;
+  color: #475569 !important;
+  font-weight: 600;
 }
 
 .light .text-sand-600, .light .text-slate-600 {
-  color: #8c887b !important;
+  color: #334155 !important;
+  font-weight: 600;
 }
 
 /* Anthropic Warm Accent Colors in Light Mode */
 .light .text-cyan-300, .light .text-cyan-400 {
-  color: #0369a1 !important;
+  color: #0284c7 !important;
   font-weight: 700;
 }
 
 .light .text-cyan-200, .light .text-cyan-100 {
-  color: #0c4a6e !important;
+  color: #0369a1 !important;
   font-weight: 700;
 }
 
 .light .text-emerald-400, .light .text-emerald-300, .light .text-cricket-emerald {
-  color: #15803d !important;
+  color: #047857 !important;
   font-weight: 700;
 }
 
@@ -262,7 +288,7 @@ html.light body {
 }
 
 .light .text-terracotta-400, .light .text-terracotta-500 {
-  color: #cc785c !important;
+  color: #c2410c !important;
   font-weight: 700;
 }
 

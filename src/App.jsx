@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
+import MobileNav from './components/MobileNav';
 import AuctionRoom from './components/AuctionRoom';
 import TeamsView from './components/TeamsView';
 import PlayersPool from './components/PlayersPool';
@@ -185,6 +186,7 @@ function AppInner() {
       return;
     }
 
+    const currentYear = new Date().getFullYear();
     const input = window.prompt(
       "⚠️ DANGER ZONE: YOU ARE ABOUT TO ERASE ALL LIVE AUCTION DATA FROM MONGODB ATLAS!\n\n" +
       "This will permanently purge:\n" +
@@ -193,10 +195,10 @@ function AppInner() {
       "• All live auction bid logs\n" +
       "• All match schedules and scorecards\n\n" +
       "To confirm this action, type the exact phrase below:\n" +
-      "RESET NEPL 2026 MONGODB DATA"
+      `RESET NEPL ${currentYear} MONGODB DATA`
     );
 
-    if (input === "RESET NEPL 2026 MONGODB DATA") {
+    if (input === `RESET NEPL ${currentYear} MONGODB DATA` || input === "RESET NEPL MONGODB DATA" || input === "RESET NEPL 2026 MONGODB DATA") {
       if (window.confirm("🔴 FINAL WARNING: Confirm permanent deletion of all live auction & team data from MongoDB Atlas?")) {
         setTeams([]);
         setPlayers([]);
@@ -259,7 +261,7 @@ function AppInner() {
   }
 
   return (
-    <div className="min-h-screen bg-[#141413] text-[#f3f1eb] font-sans pb-16 theme-root-container transition-colors duration-300">
+    <div className="min-h-screen bg-[#141413] text-[#f3f1eb] font-sans pb-28 lg:pb-16 theme-root-container transition-colors duration-300">
 
       {/* Fullscreen Projector View */}
       {isProjectorMode ? (
@@ -285,7 +287,7 @@ function AppInner() {
             onOpenAiChat={() => setIsAiChatOpen(true)}
           />
 
-          <main className="max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-4 sm:pt-6 animate-fade-in-up">
+          <main className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6 animate-fade-in-up">
             {activeTab === 'auction' && (
               <AuctionRoom
                 players={players}
@@ -339,10 +341,17 @@ function AppInner() {
             setIsOpen={setIsAiChatOpen}
           />
 
+          {/* Mobile App-like Bottom Navigation Dock */}
+          <MobileNav
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onOpenAiChat={() => setIsAiChatOpen(true)}
+          />
+
           {/* Global Cyber Footer */}
-          <footer className="mt-16 border-t border-cyan-500/15 pt-6 pb-8 text-center text-xs text-slate-400 font-mono flex flex-col sm:flex-row items-center justify-between gap-3 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+          <footer className="mt-12 lg:mt-16 border-t border-cyan-500/15 pt-6 pb-8 text-center text-xs text-slate-400 font-mono flex flex-col sm:flex-row items-center justify-between gap-3 max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
             <div>
-              © 2026 onwards Nyati Era Premier League. All rights reserved.
+              © {new Date().getFullYear()} onwards Nyati Era Premier League. All rights reserved.
             </div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 text-xs font-serif shadow-[0_0_12px_rgba(121,40,202,0.2)]">
               <span className="text-[10px] uppercase font-sans text-slate-400">Version:</span>
@@ -352,7 +361,7 @@ function AppInner() {
 
           {/* MongoDB status indicator */}
           {isMongoDB && (
-            <div className="fixed bottom-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0b1120]/95 border border-cyan-500/30 text-[10px] text-cyan-300 shadow-[0_0_15px_rgba(0,242,254,0.25)] font-mono">
+            <div className="fixed bottom-20 lg:bottom-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0b1120]/95 border border-cyan-500/30 text-[10px] text-cyan-300 shadow-[0_0_15px_rgba(0,242,254,0.25)] font-mono backdrop-blur-md">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
               MongoDB Atlas Synced
             </div>

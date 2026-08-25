@@ -48,16 +48,18 @@ export default function LoginPage() {
 
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-neon-violet p-[2px] shadow-[0_0_30px_rgba(0,242,254,0.4)] mb-4">
-            <div className="w-full h-full bg-[#070b14] rounded-[14px] flex items-center justify-center">
-              <Gavel className="w-8 h-8 text-cyan-400 transform -rotate-45" />
-            </div>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white p-1.5 shadow-[0_0_30px_rgba(204,120,92,0.4)] mb-4 border-2 border-[#cc785c]/40">
+            <img
+              src="/nyati_era_logo.png"
+              alt="Nyati Era Official Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className="text-3xl sm:text-4xl font-sans font-extrabold text-slate-100 tracking-tight">
             Nyati <span className="gradient-text-brand">Era</span>
           </h1>
-          <p className="text-cyan-400/90 text-xs sm:text-sm mt-1 font-sans font-bold tracking-wide">
-            Box Cricket Premier League 2026
+          <p className="text-[#cc785c] text-xs sm:text-sm mt-1 font-sans font-extrabold uppercase tracking-wider">
+            Box Cricket League
           </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,242,254,0.2)]">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
@@ -185,7 +187,7 @@ export default function LoginPage() {
         {/* Footer note & Copyright */}
         <div className="text-center mt-8 space-y-1.5 font-sans">
           <p className="text-xs sm:text-sm text-slate-400 font-bold">
-            © 2026 onwards Box Cricket Premier League NEPL
+            © {new Date().getFullYear()} onwards Box Cricket Premier League NEPL
           </p>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 text-xs font-serif shadow-[0_0_10px_rgba(121,40,202,0.15)]">
             <span className="text-[10px] uppercase font-sans text-slate-400">Version:</span>

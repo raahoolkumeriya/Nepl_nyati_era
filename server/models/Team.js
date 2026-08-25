@@ -28,6 +28,8 @@ const TeamSchema = new mongoose.Schema({
   maxSquadSize: { type: Number, default: 10 }, // Default 10, configurable / overridable by Super Admin
   playersCount: { type: Number, default: 0 },
   logo: String,
+  teamPhotoUrl: String, // Official generated squad photo / poster
+  bannerUrl: String,
   squad: [SquadPlayerSchema],
 }, { timestamps: true });
 

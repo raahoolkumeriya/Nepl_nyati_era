@@ -176,7 +176,7 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules, onOpenAiC
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span>NEPL (Nyati Era Premiere League) 2026 Season</span>
+            <span>NEPL (Nyati Era Premiere League) {new Date().getFullYear()} Season</span>
           </button>
 
           <button
