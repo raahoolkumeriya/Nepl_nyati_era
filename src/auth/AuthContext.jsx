@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   validateCredentials, 
   createSession, 
@@ -7,6 +7,7 @@ import {
   hasPermission, 
   getRoleConfig,
   getAllUsers,
+  syncUsersWithBackend,
   addAuctioneer,
   updateUserRole,
   toggleUserDisabled,
@@ -19,6 +20,20 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => restoreSession());
   const [usersList, setUsersList] = useState(() => getAllUsers());
+
+  // Synchronize users with MongoDB backend on startup
+  useEffect(() => {
+    let isMounted = true;
+    syncUsersWithBackend().then(synced => {
+      if (isMounted && Array.isArray(synced)) {
+        setUsersList(getAllUsers());
+      }
+    }).catch(console.warn);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const validUser = await validateCredentials(email, password);
@@ -39,21 +54,31 @@ export function AuthProvider({ children }) {
     return hasPermission(user, permission);
   }, [user]);
 
-  const refreshUsers = useCallback(() => {
+  const refreshUsers = useCallback(async () => {
+    try {
+      await syncUsersWithBackend();
+    } catch {}
     setUsersList(getAllUsers());
   }, []);
 
-  const handleAddAuctioneer = useCallback(({ name, email, password, role }) => {
-    const newUser = addAuctioneer({ name, email, password, role });
+  const handleAddAuctioneer = useCallback(({ name, email, password, role, photoUrl }) => {
+    const newUser = addAuctioneer({ name, email, password, role, photoUrl });
     setUsersList(getAllUsers());
     return newUser;
   }, []);
 
-  const handleUpdateUserRole = useCallback((email, newRole, newPassword) => {
-    const updated = updateUserRole(email, newRole, newPassword);
+  const handleUpdateUserRole = useCallback((email, newRole, newPassword, newPhotoUrl) => {
+    const updated = updateUserRole(email, newRole, newPassword, newPhotoUrl);
     setUsersList(getAllUsers());
+    if (user && user.email.toLowerCase() === email.toLowerCase()) {
+      setUser(prev => ({ 
+        ...prev, 
+        role: newRole, 
+        photoUrl: newPhotoUrl !== undefined ? newPhotoUrl : prev.photoUrl 
+      }));
+    }
     return updated;
-  }, []);
+  }, [user]);
 
   const handleToggleDisabled = useCallback((email) => {
     const updated = toggleUserDisabled(email);

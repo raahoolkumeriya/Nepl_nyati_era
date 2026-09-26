@@ -9,7 +9,7 @@ A full-stack React + Node.js application for live cricket player auctions, team 
 | Layer | Technology |
 |---|---|
 | Frontend | React 19 + Vite + Tailwind CSS |
-| Backend | Node.js + Express 5 |
+| Backend | Node.js + Express 5 + Socket.io (Real-Time Live Streaming) |
 | Database | MongoDB Atlas (via Mongoose) |
 | Auth | Role-based (Session) |
 
@@ -23,23 +23,21 @@ Comprehensive design documentation, C4 models, ERDs, and sequence flows are avai
 
 ---
 
-## Architecture
+## Architecture & Real-Time Live Streaming
 
 ```
-Browser (React)
+Browser / Mobile / TV (React 19)
+    │                     ▲
+    │  HTTP /api/*        │ WebSocket (Socket.io)
+    ▼                     │ Live Bid Broadcasts
+Express + Socket.io Server (Node.js — server/index.js & server/socket.js)
     │
-    │  HTTP/JSON calls to /api/*
-    ▼
-Express Server (Node.js — server/index.js)  ← port 3001
-    │
-    │  Mongoose queries
-    ▼
-MongoDB Atlas (nepl_cricket database)
+    ▼  Mongoose queries
+MongoDB Atlas (nepl_cricket database & auctionstates collection)
 ```
 
-> **Why this structure?**  
-> MongoDB drivers only run in server-side environments (Node.js, Python, Go, etc.), NOT in browsers.  
-> The Express layer acts as a secure bridge between the browser and the database.
+> **Real-Time Live Auction Synchronization:**  
+> When any device (Auctioneer laptop, Team Owner smartphone, or Super Admin) bids or advances a player, the bid is instantly broadcasted over Socket.io WebSockets to every connected screen with zero reload required.
 
 ---
 
@@ -96,11 +94,14 @@ Go to **Atlas → Network Access** and add your IP address (or `0.0.0.0/0` for d
 
 ## Auth Credentials
 
-| Role | Email| 
-|---|---|
-| ⚡ Super Admin | `admin@nepl.in` |
-| 🔨 Auctioneer | `auction@nepl.in` |
-| 🏏 Player | `player@nepl.in` | 
+| Role | Email | Password | Permissions |
+|---|---|---|---|
+| ⚡ Super Admin | `admin@nepl.in` | `Super@dmin2026` | Live Bidding, Sell/Unsell, Team & User Management, Projector |
+| 🔨 Auctioneer | `auction@nepl.in` | `Auction@2026` | Live Bidding, View Teams & Players, Projector |
+| 🏏 Player | `player@nepl.in` | `Player@2026` | View Teams, Players, Rules & Schedule |
+| 👑 Dev Master | `developer@nepl.in` | `Supreme@Dev2026` | Full System Reset & Dev Management |
+
+> **Tip:** On the Login Screen (`http://localhost:5173`), you can simply click on any of the account cards to autofill both email and password instantly.
 
 ---
 

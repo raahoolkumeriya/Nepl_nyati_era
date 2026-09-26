@@ -33,8 +33,11 @@ Add the following Environment Variables:
 ## 3. ⚙️ Render Web Service Configuration
 
 - **Environment**: Node
-- **Build Command**: `npm run build`
-- **Start Command**: `node server/index.js`
+- **Build Command**: `npm install && npm run build`
+- **Start Command**: `npm run server` (or `node server/index.js`)
+
+> **Note on Real-Time Live Streaming (Socket.io):**  
+> Render natively supports WebSockets (`wss://`). The live streaming auction will sync seamlessly across mobile phones, laptops, and TV screens over SSL automatically.
 
 ---
 

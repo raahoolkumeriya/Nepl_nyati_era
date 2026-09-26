@@ -18,8 +18,11 @@ import {
   Upload,
   Crown,
   Zap,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { generateUniqueNeplEmail } from '../services/auth';
 import { compressImage } from '../utils/imageCompressor';
 import { updatePlayer as apiUpdatePlayer } from '../services/api';
 import { CURRENT_YEAR, CURRENT_SEASON_TAG } from '../utils/season';
@@ -33,7 +36,7 @@ export default function PlayersPool({
   canEdit = true, 
   canDelete = true 
 }) {
-  const { can, addAuctioneer, revokeAuctioneerAccess } = useAuth();
+  const { can, addAuctioneer, revokeAuctioneerAccess, usersList } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -43,6 +46,7 @@ export default function PlayersPool({
   const [compressing, setCompressing] = useState(false);
   const [photoInfo, setPhotoInfo] = useState('');
   const [promotedInfo, setPromotedInfo] = useState(null);
+  const [showPromotedPass, setShowPromotedPass] = useState(false);
 
   const [newPlayer, setNewPlayer] = useState({
     name: '',
@@ -86,7 +90,8 @@ export default function PlayersPool({
     setEditingPlayer(player);
     const captainTeam = teams.find(t => t.captainId === player.id || t.squad?.some(s => s.id === player.id && s.isCaptain));
     const assignedTeamId = player.captainOfTeamId || (captainTeam ? captainTeam.id : (player.isCaptain && player.soldTo ? player.soldTo : ''));
-    const cleanName = player.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '.');
+    const existingEmails = (usersList || []).map(u => u.email);
+    const autoUniqueEmail = generateUniqueNeplEmail(player.name, existingEmails);
     setEditFormData({
       name: player.name,
       role: player.role,
@@ -95,7 +100,7 @@ export default function PlayersPool({
       cricHeroesUrl: player.cricHeroesUrl || 'https://cricheroes.com',
       captainOfTeamId: assignedTeamId || '',
       grantAuctioneerAccess: Boolean(player.isAuctioneer),
-      auctioneerEmail: `${cleanName}@nepl.in`,
+      auctioneerEmail: autoUniqueEmail,
       auctioneerPassword: defaultAuctioneerPass,
       isPlayingNEPL: player.isPlayingNEPL !== false,
       isNewJoiner: Boolean(player.isNewJoiner),
@@ -206,12 +211,14 @@ export default function PlayersPool({
           email,
           password,
           role: 'auctioneer',
+          photoUrl: editingPlayer.avatarUrl || null,
         });
         setPromotedInfo({
           name: editFormData.name.trim(),
           email,
           password,
           role: '🔨 Auctioneer',
+          photoUrl: editingPlayer.avatarUrl || null,
         });
       } catch (err) {
         console.warn('Auctioneer access grant error:', err);
@@ -523,15 +530,31 @@ export default function PlayersPool({
       {promotedInfo && (
         <div className="p-4 sm:p-5 rounded-2xl bg-amber-950/40 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl animate-fade-in">
           <div className="flex items-center space-x-3">
-            <span className="text-2xl p-2 bg-amber-500/20 rounded-xl border border-amber-500/40">🔨</span>
+            {promotedInfo.photoUrl ? (
+    <img src={promotedInfo.photoUrl} alt={promotedInfo.name} className="w-11 h-11 rounded-xl object-cover border border-amber-500/60 shadow-md shrink-0" />
+  ) : (
+    <span className="text-2xl p-2 bg-amber-500/20 rounded-xl border border-amber-500/40 shrink-0">🔨</span>
+  )}
             <div>
               <h4 className="font-extrabold text-amber-700 dark:text-amber-300 text-sm sm:text-base flex items-center gap-2">
                 <span>Auctioneer Console Access Granted for {promotedInfo.name}!</span>
                 <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-xs uppercase">Active</span>
               </h4>
-              <p className="text-xs sm:text-sm text-sand-300 font-mono mt-0.5">
-                Login: <strong className="text-slate-900 dark:text-white">{promotedInfo.email}</strong> • Password: <strong className="text-amber-700 dark:text-amber-300">{promotedInfo.password}</strong>
-              </p>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-sand-300 font-mono mt-0.5">
+                <span>Login: <strong className="text-slate-900 dark:text-white">{promotedInfo.email}</strong></span>
+                <span>•</span>
+                <span className="flex items-center gap-1.5">
+                  Password: <strong className="text-amber-700 dark:text-amber-300 tracking-wider">{showPromotedPass ? promotedInfo.password : '••••••••'}</strong>
+                  <button
+                    type="button"
+                    onClick={() => setShowPromotedPass(v => !v)}
+                    className="p-1 text-sand-400 hover:text-amber-300 transition"
+                    title={showPromotedPass ? "Hide password" : "Show password"}
+                  >
+                    {showPromotedPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center space-x-2 shrink-0">

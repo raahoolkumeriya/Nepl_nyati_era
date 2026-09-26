@@ -294,8 +294,8 @@ async function main() {
   const maskedUri = MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//$1:*****@');
   console.log(`[INFO] Connecting to MongoDB Atlas: ${maskedUri}`);
 
-  await mongoose.connect(MONGODB_URI);
-  console.log('\x1b[32m[SUCCESS]\x1b[0m Connected to MongoDB Atlas successfully!\n');
+  await mongoose.connect(MONGODB_URI, { dbName: 'nepl_cricket' });
+  console.log('\x1b[32m[SUCCESS]\x1b[0m Connected to MongoDB Atlas (nepl_cricket) successfully!\n');
 
   // ─────────────────────────────────────────────────────────────────────────
   // 1. PLAYERS TABLE VERIFICATION & MERGE

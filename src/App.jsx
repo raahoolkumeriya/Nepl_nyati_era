@@ -9,6 +9,7 @@ import ScheduleStandings from './components/ScheduleStandings';
 import ProjectorView from './components/ProjectorView';
 import GeminiChatBot from './components/GeminiChatBot';
 import LoginPage from './auth/LoginPage';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { TOURNAMENT_RULES } from './data/initialData';
 import { soundFx } from './utils/audio';
@@ -22,6 +23,7 @@ import {
   isMongoDB,
   checkServerHealth,
 } from './services/api';
+import { getSocket, liveBroadcastReset } from './services/socket';
 
 // ─── Inner App (needs Auth context) ─────────────────────────────────────────
 function AppInner() {
@@ -33,6 +35,8 @@ function AppInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [viewerCount, setViewerCount] = useState(1);
+  const [liveSocketConnected, setLiveSocketConnected] = useState(false);
 
   useEffect(() => {
     soundFx.enabled = soundEnabled;
@@ -86,6 +90,7 @@ function AppInner() {
     }
     
     async function loadFromMongoDB() {
+      setIsLoading(true);
       try {
         const serverUp = await checkServerHealth();
         setIsDbConnected(serverUp);
@@ -115,6 +120,117 @@ function AppInner() {
     }
     
     loadFromMongoDB();
+  }, [isAuthenticated]);
+
+  // ── Real-time Socket.io Live Streaming Auction Sync ────────────────────────
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const socket = getSocket();
+
+    const handleConnect = () => setLiveSocketConnected(true);
+    const handleDisconnect = () => setLiveSocketConnected(false);
+
+    const handleViewerCount = ({ count }) => {
+      if (typeof count === 'number') setViewerCount(count);
+    };
+
+    const handleStateSync = (state) => {
+      if (state && typeof state.viewerCount === 'number') {
+        setViewerCount(state.viewerCount);
+      }
+    };
+
+    // When any device marks a player as SOLD
+    const handlePlayerSold = (data) => {
+      const { playerId, buyerTeamId, soldPrice, player, team, logItem } = data || {};
+      if (playerId) {
+        setPlayers(prev => prev.map(p => p.id === playerId ? (player || { ...p, status: 'sold', soldPrice, soldTo: buyerTeamId }) : p));
+      }
+      if (buyerTeamId && team) {
+        setTeams(prev => prev.map(t => t.id === buyerTeamId ? team : t));
+      }
+      if (logItem) {
+        setHistory(prev => {
+          if (prev.some(h => h.id === logItem.id)) return prev;
+          return [logItem, ...prev];
+        });
+      }
+    };
+
+    // When any device marks a player as UNSOLD
+    const handlePlayerUnsold = (data) => {
+      const { playerId, player, logItem } = data || {};
+      if (playerId) {
+        setPlayers(prev => prev.map(p => p.id === playerId ? (player || { ...p, status: 'unsold' }) : p));
+      }
+      if (logItem) {
+        setHistory(prev => {
+          if (prev.some(h => h.id === logItem.id)) return prev;
+          return [logItem, ...prev];
+        });
+      }
+    };
+
+    // When a live bid is placed on any device
+    const handleBidPlaced = (data) => {
+      const { logItem } = data || {};
+      if (logItem) {
+        setHistory(prev => {
+          if (prev.some(h => h.id === logItem.id)) return prev;
+          return [logItem, ...prev];
+        });
+      }
+    };
+
+    // When admin revokes or reduces bid
+    const handleBidRevoked = (data) => {
+      if (data?.logItem) {
+        setHistory(prev => [data.logItem, ...prev]);
+      }
+    };
+
+    const handleBidReduced = (data) => {
+      if (data?.logItem) {
+        setHistory(prev => [data.logItem, ...prev]);
+      }
+    };
+
+    // Global reset
+    const handleDataReset = () => {
+      setTeams([]);
+      setPlayers([]);
+      setHistory([]);
+      setRules(TOURNAMENT_RULES);
+      setMatches([]);
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('auction:viewerCount', handleViewerCount);
+    socket.on('auction:stateSync', handleStateSync);
+    socket.on('auction:playerSold', handlePlayerSold);
+    socket.on('auction:playerUnsold', handlePlayerUnsold);
+    socket.on('auction:bidPlaced', handleBidPlaced);
+    socket.on('auction:bidRevoked', handleBidRevoked);
+    socket.on('auction:bidReduced', handleBidReduced);
+    socket.on('auction:dataReset', handleDataReset);
+
+    if (socket.connected) {
+      setLiveSocketConnected(true);
+    }
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('auction:viewerCount', handleViewerCount);
+      socket.off('auction:stateSync', handleStateSync);
+      socket.off('auction:playerSold', handlePlayerSold);
+      socket.off('auction:playerUnsold', handlePlayerUnsold);
+      socket.off('auction:bidPlaced', handleBidPlaced);
+      socket.off('auction:bidRevoked', handleBidRevoked);
+      socket.off('auction:bidReduced', handleBidReduced);
+      socket.off('auction:dataReset', handleDataReset);
+    };
   }, [isAuthenticated]);
 
   // ── Persist to localStorage (always as fallback) ──────────────────────────
@@ -213,12 +329,14 @@ function AppInner() {
         if (isMongoDB) {
           try {
             await Promise.all([savePlayers([]), saveTeams([]), saveHistory([]), saveMatches([])]);
+            liveBroadcastReset();
             alert("✅ MongoDB Atlas database successfully cleared by Supreme Master.");
           } catch (err) {
             console.warn('Reset MongoDB error:', err);
             alert("⚠️ Failed to reset MongoDB database: " + err.message);
           }
         } else {
+          liveBroadcastReset();
           alert("✅ Local storage database successfully cleared by Supreme Master.");
         }
       }
@@ -271,6 +389,8 @@ function AppInner() {
           teams={teams}
           setTeams={setTeams}
           onClose={() => setIsProjectorMode(false)}
+          viewerCount={viewerCount}
+          liveSocketConnected={liveSocketConnected}
         />
       ) : (
         <>
@@ -285,6 +405,8 @@ function AppInner() {
             players={players}
             setPlayers={setPlayers}
             onOpenAiChat={() => setIsAiChatOpen(true)}
+            viewerCount={viewerCount}
+            liveSocketConnected={liveSocketConnected}
           />
 
           <main className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6 animate-fade-in-up">
@@ -296,6 +418,8 @@ function AppInner() {
                 setTeams={setTeams}
                 history={history}
                 setHistory={setHistory}
+                viewerCount={viewerCount}
+                liveSocketConnected={liveSocketConnected}
               />
             )}
             {activeTab === 'teams' && (
@@ -375,8 +499,10 @@ function AppInner() {
 // ─── Root App with Provider ──────────────────────────────────────────────────
 export default function App() {
   return (
-    <AuthProvider>
-      <AppInner />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

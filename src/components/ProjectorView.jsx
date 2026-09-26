@@ -27,13 +27,22 @@ import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam } from '..
 import { useAuth } from '../auth/AuthContext';
 import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
 import { calculatePlayerPerformance } from '../utils/playerScore';
+import { 
+  getSocket, 
+  liveSelectPlayer, 
+  livePlaceBid, 
+  liveMarkSold, 
+  liveMarkUnsold 
+} from '../services/socket';
 
 export default function ProjectorView({ 
   players = [], 
   setPlayers, 
   teams = [], 
   setTeams, 
-  onClose 
+  onClose,
+  viewerCount = 1,
+  liveSocketConnected = false,
 }) {
   const { user, can } = useAuth();
   const isSuperAdmin = user?.role === 'superuser';
@@ -54,6 +63,8 @@ export default function ProjectorView({
     null;
 
   const [selectedId, setSelectedId] = useState(defaultPriorityPlayer?.id || null);
+  const [liveCurrentBid, setLiveCurrentBid] = useState(null);
+  const [liveHighBidder, setLiveHighBidder] = useState(null);
 
   // Sync selected player if list updates or if selectedId is invalid
   useEffect(() => {
@@ -63,6 +74,81 @@ export default function ProjectorView({
       }
     }
   }, [players, selectedId]);
+
+  // ── Multi-Device Real-Time Live Streaming Socket Listeners ────────────────
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit('auction:getState');
+
+    const handleStateSync = (state) => {
+      if (state && state.activePlayerId) {
+        setSelectedId(state.activePlayerId);
+        if (state.currentBid) setLiveCurrentBid(state.currentBid);
+        if (state.highBidder) setLiveHighBidder(state.highBidder);
+      }
+    };
+
+    const handlePlayerSelected = (data) => {
+      if (data && data.activePlayerId) {
+        setSelectedId(data.activePlayerId);
+        setLiveCurrentBid(data.currentBid || 500);
+        setLiveHighBidder(null);
+      }
+    };
+
+    const handleBidPlaced = (data) => {
+      if (data) {
+        if (data.playerId) setSelectedId(data.playerId);
+        setLiveCurrentBid(data.currentBid);
+        setLiveHighBidder(data.highBidder);
+        soundFx.playBid();
+      }
+    };
+
+    const handlePlayerSold = () => {
+      soundFx.playSold();
+      confetti({
+        particleCount: 200,
+        spread: 100,
+        origin: { y: 0.5 }
+      });
+    };
+
+    const handlePlayerUnsold = () => {
+      soundFx.playUnsold();
+    };
+
+    const handleBidRevoked = (data) => {
+      if (data) {
+        setLiveCurrentBid(data.currentBid);
+        setLiveHighBidder(null);
+      }
+    };
+
+    const handleBidReduced = (data) => {
+      if (data) {
+        setLiveCurrentBid(data.currentBid);
+      }
+    };
+
+    socket.on('auction:stateSync', handleStateSync);
+    socket.on('auction:playerSelected', handlePlayerSelected);
+    socket.on('auction:bidPlaced', handleBidPlaced);
+    socket.on('auction:playerSold', handlePlayerSold);
+    socket.on('auction:playerUnsold', handlePlayerUnsold);
+    socket.on('auction:bidRevoked', handleBidRevoked);
+    socket.on('auction:bidReduced', handleBidReduced);
+
+    return () => {
+      socket.off('auction:stateSync', handleStateSync);
+      socket.off('auction:playerSelected', handlePlayerSelected);
+      socket.off('auction:bidPlaced', handleBidPlaced);
+      socket.off('auction:playerSold', handlePlayerSold);
+      socket.off('auction:playerUnsold', handlePlayerUnsold);
+      socket.off('auction:bidRevoked', handleBidRevoked);
+      socket.off('auction:bidReduced', handleBidReduced);
+    };
+  }, []);
 
   const activePlayer = players.find(p => p.id === selectedId) || defaultPriorityPlayer;
   const isSoldOut = activePlayer?.status === 'sold';
@@ -126,11 +212,11 @@ export default function ProjectorView({
 
   // Buyer team if sold, or current leading team if bidding
   const buyerTeamObj = activePlayer && isSoldOut ? teams.find(t => t.id === activePlayer.soldTo) : null;
-  const leadingTeamObj = activePlayer ? teams.find(t => t.id === activePlayer.leadingTeam) : null;
-  const displayedTeamObj = buyerTeamObj || leadingTeamObj;
+  const leadingTeamObj = activePlayer ? teams.find(t => t.id === (liveHighBidder?.id || activePlayer.leadingTeam)) : null;
+  const displayedTeamObj = buyerTeamObj || (liveHighBidder ? (teams.find(t => t.id === liveHighBidder.id) || liveHighBidder) : leadingTeamObj);
 
   const currentBid = activePlayer ? (
-    isSoldOut ? (activePlayer.soldPrice || activePlayer.basePrice) : (activePlayer.currentBid || activePlayer.basePrice)
+    isSoldOut ? (activePlayer.soldPrice || activePlayer.basePrice) : (liveCurrentBid || activePlayer.currentBid || activePlayer.basePrice)
   ) : 0;
 
   // ── Navigation Handlers ───────────────────────────────────────────────────
@@ -143,27 +229,35 @@ export default function ProjectorView({
   const handlePrevPlayer = () => {
     if (players.length === 0) return;
     const newIdx = currentIndex > 0 ? currentIndex - 1 : players.length - 1;
-    setSelectedId(players[newIdx].id);
+    const target = players[newIdx];
+    setSelectedId(target.id);
+    liveSelectPlayer(target.id, target.basePrice);
   };
 
   const handleNextPlayer = () => {
     if (players.length === 0) return;
     const newIdx = currentIndex < players.length - 1 ? currentIndex + 1 : 0;
-    setSelectedId(players[newIdx].id);
+    const target = players[newIdx];
+    setSelectedId(target.id);
+    liveSelectPlayer(target.id, target.basePrice);
   };
 
   const handlePrevAvailablePlayer = (e) => {
     if (e) e.stopPropagation();
     if (availablePool.length === 0) return;
     const newIdx = currentAvailableIdx > 0 ? currentAvailableIdx - 1 : availablePool.length - 1;
-    setSelectedId(availablePool[newIdx].id);
+    const target = availablePool[newIdx];
+    setSelectedId(target.id);
+    liveSelectPlayer(target.id, target.basePrice);
   };
 
   const handleNextAvailablePlayer = (e) => {
     if (e) e.stopPropagation();
     if (availablePool.length === 0) return;
     const newIdx = currentAvailableIdx < availablePool.length - 1 ? currentAvailableIdx + 1 : 0;
-    setSelectedId(availablePool[newIdx].id);
+    const target = availablePool[newIdx];
+    setSelectedId(target.id);
+    liveSelectPlayer(target.id, target.basePrice);
   };
 
   // ── Quick Bid Handler ─────────────────────────────────────────────────────
@@ -200,6 +294,8 @@ export default function ProjectorView({
     }
 
     soundFx.playBid();
+    setLiveCurrentBid(nextBid);
+    setLiveHighBidder(team);
 
     setPlayers(prev => prev.map(p => {
       if (p.id === activePlayer.id) {
@@ -207,6 +303,17 @@ export default function ProjectorView({
       }
       return p;
     }));
+
+    livePlaceBid(activePlayer.id, team, nextBid, {
+      id: Date.now().toString(),
+      playerId: activePlayer.id,
+      playerName: activePlayer.name,
+      teamId: team.id,
+      teamName: team.name,
+      teamColor: team.color,
+      amount: nextBid,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    });
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -262,6 +369,16 @@ export default function ProjectorView({
     apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB sold player update err:', err));
     apiUpdateTeam(buyerTeam.id, updatedTeam).catch(err => console.warn('MongoDB sold team update err:', err));
 
+    const soldLogItem = {
+      id: Date.now().toString(),
+      type: 'SOLD',
+      playerName: activePlayer.name,
+      teamName: buyerTeam.name,
+      amount: finalPrice,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    liveMarkSold(activePlayer.id, buyerTeam.id, finalPrice, updatedPlayer, updatedTeam, soldLogItem);
+
     setTimeout(() => {
       setIsProcessing(false);
     }, 1200);
@@ -281,6 +398,14 @@ export default function ProjectorView({
     };
     setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
     apiUpdatePlayer(activePlayer.id, updated).catch(err => console.warn('MongoDB unsold update error:', err));
+    
+    const unsoldLogItem = {
+      id: Date.now().toString(),
+      type: 'UNSOLD',
+      playerName: activePlayer.name,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    liveMarkUnsold(activePlayer.id, updated, unsoldLogItem);
   };
 
   // ── Revoke Bid Handler ───────────────────────────────────────────────────
@@ -323,10 +448,16 @@ export default function ProjectorView({
                 कर्मण्येवाधिकारस्ते
               </span>
             </div>
-            <p className="text-xs text-cyan-400 font-mono font-bold flex items-center gap-2">
-              <span>Live TV Projector Screen</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#00ff87]" />
-            </p>
+            <div className="flex items-center gap-2.5 mt-0.5">
+              <p className="text-xs text-cyan-400 font-mono font-bold flex items-center gap-2">
+                <span>Live TV Projector Screen</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#00ff87]" />
+              </p>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-[10px] font-bold text-red-400 font-mono tracking-tight animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                <span>STREAM SYNCED • {viewerCount || 1} {viewerCount === 1 ? 'DEVICE' : 'DEVICES'}</span>
+              </span>
+            </div>
           </div>
         </div>
 

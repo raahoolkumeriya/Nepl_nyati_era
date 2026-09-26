@@ -196,3 +196,32 @@ export async function deleteMatch(id) {
   });
 }
 
+// ── Users & Authentication ──────────────────────────────────────────────────
+
+export async function fetchUsersApi() {
+  return apiFetch('/auth/users');
+}
+
+export async function saveUserApi(userData) {
+  return apiFetch('/auth/users', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+}
+
+export async function updateUserApi(email, userData) {
+  return apiFetch(`/auth/users/${encodeURIComponent(email)}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  });
+}
+
+export async function deleteUserApi(email) {
+  return apiFetch(`/auth/users/${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function generateEmailApi(name, exclude = '') {
+  return apiFetch(`/auth/generate-email?name=${encodeURIComponent(name)}${exclude ? `&exclude=${encodeURIComponent(exclude)}` : ''}`);
+}

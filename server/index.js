@@ -12,9 +12,14 @@ import matchesRouter from './routes/matches.js';
 import authRouter from './routes/auth.js';
 import geminiRouter from './routes/gemini.js';
 import Rule from './models/Rule.js';
+import Team from './models/Team.js';
 import { DEFAULT_RULES } from './data/defaultRules.js';
+import { DEFAULT_TEAMS } from './data/defaultTeams.js';
 import { serveSwaggerUi, setupSwaggerUi, openApiSpec } from './swagger.js';
 import { verifyApiKey } from './middleware/authApiKey.js';
+
+import http from 'http';
+import { setupSocket } from './socket.js';
 
 dotenv.config();
 
@@ -22,7 +27,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 3001;
+
+// Setup Socket.io real-time streaming engine
+setupSocket(httpServer);
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({
@@ -31,7 +40,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   credentials: true,
 }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // Protect mutating API routes with API key verification
 app.use('/api', verifyApiKey);
@@ -102,13 +111,13 @@ app.use(express.static(distPath));
 
 // SPA Fallback for client-side routing (compatible with Express 4/5 & path-to-regexp 8+)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/docs')) return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/docs') || req.path.startsWith('/socket.io')) return next();
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// ── Start Express Server Immediately (Render compatibility) ──────────────────
-app.listen(PORT, () => {
-  console.log(`\n🚀  NEPL Server running on port ${PORT}`);
+// ── Start Express + Socket.io Server (Render compatibility) ──────────────────
+httpServer.listen(PORT, () => {
+  console.log(`\n🚀  NEPL Server + Live Socket Stream running on port ${PORT}`);
   console.log(`📖  Interactive API Docs available at http://localhost:${PORT}/api/docs`);
   console.log(`🔑  API Key protection active for mutating routes (x-api-key required)\n`);
 });
@@ -136,12 +145,25 @@ if (!MONGODB_URI || MONGODB_URI.includes('cluster0.example.mongodb.net')) {
       const existingRulesCount = await Rule.countDocuments();
       if (existingRulesCount === 0) {
         await Rule.insertMany(DEFAULT_RULES);
-        console.log(`📌  Seeded ${DEFAULT_RULES.length} tournament rules into MongoDB Atlas (rules collection)\n`);
+        console.log(`📌  Seeded ${DEFAULT_RULES.length} tournament rules into MongoDB Atlas (rules collection)`);
       } else {
-        console.log(`📌  MongoDB Atlas contains ${existingRulesCount} tournament rules\n`);
+        console.log(`📌  MongoDB Atlas contains ${existingRulesCount} tournament rules`);
       }
     } catch (err) {
       console.warn('⚠️  Rule auto-seed warning:', err.message);
+    }
+
+    // Auto-seed teams collection in MongoDB if empty
+    try {
+      const existingTeamsCount = await Team.countDocuments();
+      if (existingTeamsCount === 0) {
+        await Team.insertMany(DEFAULT_TEAMS);
+        console.log(`📌  Seeded ${DEFAULT_TEAMS.length} franchise teams into MongoDB Atlas (teams collection)\n`);
+      } else {
+        console.log(`📌  MongoDB Atlas contains ${existingTeamsCount} franchise teams\n`);
+      }
+    } catch (err) {
+      console.warn('⚠️  Team auto-seed warning:', err.message);
     }
   })
   .catch(err => {

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const BidHistorySchema = new mongoose.Schema({
   id: { type: String, required: true },
-  type: { type: String, enum: ['SOLD', 'UNSOLD', 'BID'], default: 'BID' },
+  type: { type: String, default: 'BID' },
   playerId: String,
   playerName: String,
   teamId: String,

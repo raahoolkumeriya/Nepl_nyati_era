@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
 import {
@@ -24,6 +24,15 @@ import { soundFx } from '../utils/audio';
 import { useAuth } from '../auth/AuthContext';
 import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam, isMongoDB } from '../services/api';
 import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
+import { 
+  getSocket, 
+  liveSelectPlayer, 
+  livePlaceBid, 
+  liveMarkSold, 
+  liveMarkUnsold, 
+  liveRevokeBid, 
+  liveReduceBid 
+} from '../services/socket';
 
 export default function AuctionRoom({
   players,
@@ -31,7 +40,9 @@ export default function AuctionRoom({
   teams,
   setTeams,
   history,
-  setHistory
+  setHistory,
+  viewerCount = 1,
+  liveSocketConnected = false,
 }) {
   const { user, can } = useAuth();
   const isSuperAdmin = user?.role === 'superuser';
@@ -45,10 +56,14 @@ export default function AuctionRoom({
     return firstAvail ? firstAvail.id : (players.find(p => p.isPlayingNEPL !== false)?.id || players[0]?.id || null);
   });
 
+  const lastActivePlayerIdRef = useRef(activePlayerId);
+
   useEffect(() => {
     if ((!activePlayerId || !players.some(p => p.id === activePlayerId)) && players.length > 0) {
       const firstAvail = players.find(p => p.status === 'available' && p.isPlayingNEPL !== false);
-      setActivePlayerId(firstAvail ? firstAvail.id : (players.find(p => p.isPlayingNEPL !== false)?.id || players[0]?.id));
+      const nextId = firstAvail ? firstAvail.id : (players.find(p => p.isPlayingNEPL !== false)?.id || players[0]?.id);
+      setActivePlayerId(nextId);
+      lastActivePlayerIdRef.current = nextId;
     }
   }, [players, activePlayerId]);
 
@@ -58,8 +73,10 @@ export default function AuctionRoom({
   const [autoSimulate, setAutoSimulate] = useState(false);
   const [selectedBiddingTeamId, setSelectedBiddingTeamId] = useState(teams[0]?.id || null);
 
+  // Sync when active player changes locally
   useEffect(() => {
-    if (activePlayer) {
+    if (activePlayer && lastActivePlayerIdRef.current !== activePlayerId) {
+      lastActivePlayerIdRef.current = activePlayerId;
       if (activePlayer.status === 'sold') {
         setCurrentBid(activePlayer.soldPrice);
         const buyer = teams.find(t => t.id === activePlayer.soldTo);
@@ -69,7 +86,89 @@ export default function AuctionRoom({
         setHighBidder(null);
       }
     }
-  }, [activePlayerId, players]);
+  }, [activePlayerId, activePlayer, teams]);
+
+  // ── Multi-Device Real-Time Live Streaming Socket Listeners ────────────────
+  useEffect(() => {
+    const socket = getSocket();
+
+    // Request latest active live state when entering the room
+    socket.emit('auction:getState');
+
+    const handleStateSync = (state) => {
+      if (state && state.activePlayerId) {
+        setActivePlayerId(state.activePlayerId);
+        lastActivePlayerIdRef.current = state.activePlayerId;
+        if (typeof state.currentBid === 'number' && state.currentBid > 0) {
+          setCurrentBid(state.currentBid);
+        }
+        if (state.highBidder) {
+          setHighBidder(state.highBidder);
+        }
+      }
+    };
+
+    const handlePlayerSelected = (data) => {
+      if (data && data.activePlayerId) {
+        setActivePlayerId(data.activePlayerId);
+        lastActivePlayerIdRef.current = data.activePlayerId;
+        setCurrentBid(data.currentBid || 500);
+        setHighBidder(null);
+      }
+    };
+
+    const handleBidPlaced = (data) => {
+      if (data) {
+        if (data.playerId) {
+          setActivePlayerId(data.playerId);
+          lastActivePlayerIdRef.current = data.playerId;
+        }
+        setCurrentBid(data.currentBid);
+        setHighBidder(data.highBidder);
+        soundFx.playBid();
+      }
+    };
+
+    const handlePlayerSold = () => {
+      soundFx.playSold();
+      confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
+    };
+
+    const handlePlayerUnsold = () => {
+      soundFx.playUnsold();
+    };
+
+    const handleBidRevoked = (data) => {
+      if (data) {
+        setCurrentBid(data.currentBid);
+        setHighBidder(null);
+      }
+    };
+
+    const handleBidReduced = (data) => {
+      if (data) {
+        setCurrentBid(data.currentBid);
+      }
+    };
+
+    socket.on('auction:stateSync', handleStateSync);
+    socket.on('auction:playerSelected', handlePlayerSelected);
+    socket.on('auction:bidPlaced', handleBidPlaced);
+    socket.on('auction:playerSold', handlePlayerSold);
+    socket.on('auction:playerUnsold', handlePlayerUnsold);
+    socket.on('auction:bidRevoked', handleBidRevoked);
+    socket.on('auction:bidReduced', handleBidReduced);
+
+    return () => {
+      socket.off('auction:stateSync', handleStateSync);
+      socket.off('auction:playerSelected', handlePlayerSelected);
+      socket.off('auction:bidPlaced', handleBidPlaced);
+      socket.off('auction:playerSold', handlePlayerSold);
+      socket.off('auction:playerUnsold', handlePlayerUnsold);
+      socket.off('auction:bidRevoked', handleBidRevoked);
+      socket.off('auction:bidReduced', handleBidReduced);
+    };
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -141,6 +240,9 @@ export default function AuctionRoom({
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     };
     setHistory(prev => [logItem, ...prev]);
+
+    // 📡 Broadcast live bid across all connected devices in real time!
+    livePlaceBid(activePlayer.id, team, newBidAmount, logItem);
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -157,14 +259,16 @@ export default function AuctionRoom({
       const baseVal = activePlayer.basePrice;
       setCurrentBid(baseVal);
       setHighBidder(null);
-      setHistory(prev => [{
+      const revokeLog = {
         id: Date.now().toString(),
         type: 'ADMIN_REVOKE',
         playerName: activePlayer.name,
         teamName: highBidder.name,
         amount: baseVal,
         timestamp: new Date().toLocaleTimeString()
-      }, ...prev]);
+      };
+      setHistory(prev => [revokeLog, ...prev]);
+      liveRevokeBid(activePlayer.id, baseVal, revokeLog);
     }
   };
 
@@ -185,14 +289,16 @@ export default function AuctionRoom({
     setShowReduceModal(false);
     setReducedBidInput('');
 
-    setHistory(prev => [{
+    const reduceLog = {
       id: Date.now().toString(),
       type: 'ADMIN_REDUCE',
       playerName: activePlayer.name,
       teamName: highBidder.name,
       amount: newPrice,
       timestamp: new Date().toLocaleTimeString()
-    }, ...prev]);
+    };
+    setHistory(prev => [reduceLog, ...prev]);
+    liveReduceBid(activePlayer.id, newPrice, reduceLog);
   };
 
   const handleMarkSold = () => {
@@ -236,18 +342,26 @@ export default function AuctionRoom({
     apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player sold update err:', err));
     apiUpdateTeam(buyerTeamId, updatedTeam).catch(err => console.warn('MongoDB team sold update err:', err));
 
-    setHistory(prev => [{
+    const soldLogItem = {
       id: Date.now().toString(),
       type: 'SOLD',
       playerName: activePlayer.name,
       teamName: highBidder.name,
       amount: soldPrice,
       timestamp: new Date().toLocaleTimeString()
-    }, ...prev]);
+    };
+    setHistory(prev => [soldLogItem, ...prev]);
+
+    // 📡 Broadcast player sold across all connected devices in real time!
+    liveMarkSold(activePlayer.id, buyerTeamId, soldPrice, updatedPlayer, updatedTeam, soldLogItem);
 
     setTimeout(() => {
       const nextP = players.find(p => p.id !== activePlayer.id && p.status === 'available');
-      if (nextP) setActivePlayerId(nextP.id);
+      if (nextP) {
+        setActivePlayerId(nextP.id);
+        lastActivePlayerIdRef.current = nextP.id;
+        liveSelectPlayer(nextP.id, nextP.basePrice);
+      }
       setIsProcessing(false);
     }, 1200);
   };
@@ -258,30 +372,52 @@ export default function AuctionRoom({
     const updatedPlayer = { ...activePlayer, status: 'unsold' };
     setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updatedPlayer : p));
     apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player unsold update err:', err));
-    setHistory(prev => [{
+    const unsoldLogItem = {
       id: Date.now().toString(),
       type: 'UNSOLD',
       playerName: activePlayer.name,
       timestamp: new Date().toLocaleTimeString()
-    }, ...prev]);
+    };
+    setHistory(prev => [unsoldLogItem, ...prev]);
+
+    // 📡 Broadcast player unsold across all connected devices in real time!
+    liveMarkUnsold(activePlayer.id, updatedPlayer, unsoldLogItem);
+
     const nextP = players.find(p => p.id !== activePlayer.id && p.status === 'available');
-    if (nextP) setActivePlayerId(nextP.id);
+    if (nextP) {
+      setActivePlayerId(nextP.id);
+      lastActivePlayerIdRef.current = nextP.id;
+      liveSelectPlayer(nextP.id, nextP.basePrice);
+    }
   };
 
   const handleNextPlayer = () => {
     const i = players.findIndex(p => p.id === activePlayerId);
-    if (i < players.length - 1) setActivePlayerId(players[i + 1].id);
+    if (i < players.length - 1) {
+      const nextP = players[i + 1];
+      setActivePlayerId(nextP.id);
+      lastActivePlayerIdRef.current = nextP.id;
+      liveSelectPlayer(nextP.id, nextP.basePrice);
+    }
   };
 
   const handlePrevPlayer = () => {
     const i = players.findIndex(p => p.id === activePlayerId);
-    if (i > 0) setActivePlayerId(players[i - 1].id);
+    if (i > 0) {
+      const prevP = players[i - 1];
+      setActivePlayerId(prevP.id);
+      lastActivePlayerIdRef.current = prevP.id;
+      liveSelectPlayer(prevP.id, prevP.basePrice);
+    }
   };
 
   const handleRandomPlayer = () => {
     const unsold = players.filter(p => p.status === 'available');
     if (unsold.length > 0) {
-      setActivePlayerId(unsold[Math.floor(Math.random() * unsold.length)].id);
+      const randP = unsold[Math.floor(Math.random() * unsold.length)];
+      setActivePlayerId(randP.id);
+      lastActivePlayerIdRef.current = randP.id;
+      liveSelectPlayer(randP.id, randP.basePrice);
     }
   };
 
@@ -290,10 +426,13 @@ export default function AuctionRoom({
 
       {/* ── Top Control Bar ── */}
       <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 border border-warm-700/50">
-        <div className="flex items-center space-x-3">
-          <span className="px-3 py-1 rounded-full bg-terracotta-600/20 text-terracotta-300 font-bold text-xs border border-terracotta-500/30 flex items-center gap-1.5">
-            <span className="live-dot" />
-            <span>Live Auction Round</span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="px-3 py-1 rounded-full bg-red-500/15 text-red-400 font-bold text-xs border border-red-500/30 flex items-center gap-1.5 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" />
+            <span>LIVE STREAM ROUND</span>
+          </span>
+          <span className="px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs border border-cyan-500/20 font-bold">
+            📡 {viewerCount || 1} {viewerCount === 1 ? 'Device' : 'Devices'} Connected
           </span>
           <span className="text-sand-500 text-xs font-mono">
             {players.filter(p => p.status === 'sold').length} / {players.length} Players Sold

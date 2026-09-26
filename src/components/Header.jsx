@@ -35,6 +35,8 @@ export default function Header({
   players = [],
   setPlayers,
   onOpenAiChat,
+  viewerCount = 1,
+  liveSocketConnected = false,
 }) {
   const { user, logout, can, roleConfig } = useAuth();
   const { theme, toggleTheme, isDark } = useTheme();
@@ -75,10 +77,11 @@ export default function Header({
                   Nyati Era
                 </h1>
               </div>
-              <p className="text-xs sm:text-sm text-stone-300 dark:text-stone-300 light:text-stone-800 flex items-center gap-2 font-extrabold uppercase tracking-wider mt-0.5">
-                <span>Box Cricket League</span>
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                <span className="text-xs sm:text-sm text-stone-300 dark:text-stone-300 light:text-stone-800 font-extrabold uppercase tracking-wider">
+                  Box Cricket League
+                </span>
+              </div>
             </div>
           </div>
 
@@ -196,7 +199,11 @@ export default function Header({
                   onClick={() => setShowUserMenu(v => !v)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 hover:border-stone-700 transition shadow-sm"
                 >
-                  <span className="text-sm leading-none">{user.avatar}</span>
+                  {user.photoUrl ? (
+    <img src={user.photoUrl} alt={user.name} className="w-6 h-6 rounded-full object-cover border border-amber-500/60 shadow-sm" />
+  ) : (
+    <span className="text-sm leading-none">{user.avatar}</span>
+  )}
                   <div className="hidden sm:block text-left">
                     <div className="text-xs font-bold text-sand-100 leading-tight">{user.name}</div>
                     <div className="text-[8px] font-semibold text-[#cc785c] uppercase tracking-wider">
@@ -211,7 +218,11 @@ export default function Header({
                   <div className="absolute right-0 top-full mt-2 w-56 warm-card rounded-2xl border border-cyan-500/30 shadow-[0_10px_40px_rgba(0,0,0,0.8)] p-2.5 z-50">
                     {/* Role badge */}
                     <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1.5 bg-slate-900/90 border border-cyan-500/30">
-                      <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
+                      {user.photoUrl ? (
+    <img src={user.photoUrl} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-cyan-400 shadow-sm shrink-0" />
+  ) : (
+    <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
+  )}
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-cyan-300 font-display">{roleConfig?.label}</div>
                         <div className="text-[10px] text-slate-400 font-mono truncate">{user.email}</div>
