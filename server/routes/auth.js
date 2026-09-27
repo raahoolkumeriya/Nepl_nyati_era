@@ -31,11 +31,16 @@ const ROLE_METADATA = {
  * Helper to fetch system users configured via environment variables
  */
 function getSystemEnvUsers() {
+  const supremePass = (process.env.SUPREMEMASTER_PASS || process.env.VITE_SUPREMEMASTER_PASS || '').trim();
+  const adminPass = (process.env.SUPERUSER_PASS || process.env.VITE_SUPERUSER_PASS || '').trim();
+  const auctioneerPass = (process.env.AUCTIONEER_PASS || process.env.VITE_AUCTIONEER_PASS || '').trim();
+  const playerPass = (process.env.PLAYER_PASS || process.env.VITE_PLAYER_PASS || '').trim();
+
   return [
     {
       id: 'usr-supreme-master-default',
       email: (process.env.SUPREMEMASTER_EMAIL || process.env.VITE_SUPREMEMASTER_EMAIL || 'developer@nepl.in').trim().toLowerCase(),
-      password: (process.env.SUPREMEMASTER_PASS || process.env.VITE_SUPREMEMASTER_PASS || 'Supreme@Dev2026').trim(),
+      password: supremePass,
       ...ROLE_METADATA.suprememaster,
       isDefault: true,
       isDisabled: false,
@@ -43,7 +48,7 @@ function getSystemEnvUsers() {
     {
       id: 'usr-admin-default',
       email: (process.env.SUPERUSER_EMAIL || process.env.VITE_SUPERUSER_EMAIL || 'admin@nepl.in').trim().toLowerCase(),
-      password: (process.env.SUPERUSER_PASS || process.env.VITE_SUPERUSER_PASS || 'Super@dmin2026').trim(),
+      password: adminPass,
       ...ROLE_METADATA.superuser,
       isDefault: true,
       isDisabled: false,
@@ -51,7 +56,7 @@ function getSystemEnvUsers() {
     {
       id: 'usr-auction-default',
       email: (process.env.AUCTIONEER_EMAIL || process.env.VITE_AUCTIONEER_EMAIL || 'auction@nepl.in').trim().toLowerCase(),
-      password: (process.env.AUCTIONEER_PASS || process.env.VITE_AUCTIONEER_PASS || 'Auction@2026').trim(),
+      password: auctioneerPass,
       ...ROLE_METADATA.auctioneer,
       isDefault: true,
       isDisabled: false,
@@ -59,7 +64,7 @@ function getSystemEnvUsers() {
     {
       id: 'usr-player-default',
       email: (process.env.PLAYER_EMAIL || process.env.VITE_PLAYER_EMAIL || 'player@nepl.in').trim().toLowerCase(),
-      password: (process.env.PLAYER_PASS || process.env.VITE_PLAYER_PASS || 'Player@2026').trim(),
+      password: playerPass,
       ...ROLE_METADATA.player,
       isDefault: true,
       isDisabled: false,
@@ -196,6 +201,7 @@ router.get('/users', async (req, res) => {
     }
 
     // Merge system users and db users (db users can override system users if updated)
+    // Never expose plain passwords in user directory listings!
     const usersMap = new Map();
     for (const u of systemUsers) {
       usersMap.set(u.email.toLowerCase(), {
@@ -207,7 +213,6 @@ router.get('/users', async (req, res) => {
         photoUrl: u.photoUrl || null,
         isDefault: true,
         isDisabled: Boolean(u.isDisabled),
-        password: u.password,
       });
     }
 
@@ -221,7 +226,6 @@ router.get('/users', async (req, res) => {
         photoUrl: u.photoUrl || null,
         isDefault: Boolean(u.isDefault),
         isDisabled: Boolean(u.isDisabled),
-        password: u.password,
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
       });
@@ -256,7 +260,7 @@ router.post('/users', async (req, res) => {
     }
 
     const cleanEmail = finalEmail.toLowerCase();
-    const cleanPassword = password ? password.trim() : (process.env.VITE_AUCTIONEER_PASS || 'Auction@2026').trim();
+    const cleanPassword = password ? password.trim() : (process.env.AUCTIONEER_PASS || process.env.VITE_AUCTIONEER_PASS || '').trim();
     const finalRole = role || 'auctioneer';
     const finalAvatar = avatar || (finalRole === 'suprememaster' ? '👑' : finalRole === 'superuser' ? '⚡' : finalRole === 'auctioneer' ? '🔨' : '🏏');
 
@@ -275,10 +279,10 @@ router.post('/users', async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { email: cleanEmail },
       { $set: userData },
-      { upsert: true, new: true, lean: true }
+      { upsert: true, returnDocument: 'after', lean: true }
     );
 
-    const { _id, __v, ...safeSaved } = updatedUser;
+    const { _id, __v, password: _pw, ...safeSaved } = updatedUser;
     res.status(201).json(safeSaved);
   } catch (err) {
     console.error('Save user error:', err);
@@ -304,10 +308,10 @@ router.put('/users/:email', async (req, res) => {
     const updated = await User.findOneAndUpdate(
       { email: cleanEmail },
       { $set: updates },
-      { new: true, upsert: true, lean: true }
+      { returnDocument: 'after', upsert: true, lean: true }
     );
 
-    const { _id, __v, ...safeUser } = updated;
+    const { _id, __v, password: _pw, ...safeUser } = updated;
     res.json(safeUser);
   } catch (err) {
     console.error('Update user error:', err);

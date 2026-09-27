@@ -214,10 +214,10 @@ const OFFICIAL_RULES = [
 const OFFICIAL_TEAMS_CONFIG = [
   {
     id: 'team-1',
-    name: 'Team A - Avinav',
+    name: 'Team A',
     shortName: 'TMA',
-    owner: 'Avinav Chandra',
-    captainSearch: 'avinav',
+    owner: 'Team A owner',
+    captainSearch: 'Team A owner',
     color: '#3b82f6',
     gradient: 'from-blue-600 to-blue-900',
     logo: '🦁',
@@ -226,10 +226,10 @@ const OFFICIAL_TEAMS_CONFIG = [
   },
   {
     id: 'team-2',
-    name: 'Team B - Tushar',
+    name: 'Team B',
     shortName: 'TMB',
-    owner: 'Tushar Patil',
-    captainSearch: 'tushar',
+    owner: 'Team B owner',
+    captainSearch: 'Team B owner',
     color: '#ef4444',
     gradient: 'from-red-600 to-red-950',
     logo: '🔥',
@@ -238,10 +238,10 @@ const OFFICIAL_TEAMS_CONFIG = [
   },
   {
     id: 'team-3',
-    name: 'Team C - Jugal',
+    name: 'Team C',
     shortName: 'TMC',
-    owner: 'Jugal Kishore',
-    captainSearch: 'jugal',
+    owner: 'Team C owner',
+    captainSearch: 'Team C owner',
     color: '#06b6d4',
     gradient: 'from-cyan-500 to-cyan-950',
     logo: '⚡',
@@ -250,10 +250,10 @@ const OFFICIAL_TEAMS_CONFIG = [
   },
   {
     id: 'team-4',
-    name: 'Team D - Amit',
+    name: 'Team D',
     shortName: 'TMD',
-    owner: 'Amit Sharma',
-    captainSearch: 'amit',
+    owner: 'Team D owner',
+    captainSearch: 'Team D owner',
     color: '#10b981',
     gradient: 'from-emerald-500 to-emerald-950',
     logo: '🛡️',
@@ -262,10 +262,10 @@ const OFFICIAL_TEAMS_CONFIG = [
   },
   {
     id: 'team-5',
-    name: 'Team E - Abhishek',
+    name: 'Team E',
     shortName: 'TME',
-    owner: 'Abhishek Roy',
-    captainSearch: 'abhishek',
+    owner: 'Team E owner',
+    captainSearch: 'Team E owner',
     color: '#f59e0b',
     gradient: 'from-amber-500 to-amber-950',
     logo: '👑',
@@ -274,10 +274,10 @@ const OFFICIAL_TEAMS_CONFIG = [
   },
   {
     id: 'team-6',
-    name: 'Team F - Mahesh',
+    name: 'Team F',
     shortName: 'TMF',
-    owner: 'Mahesh G',
-    captainSearch: 'mahesh',
+    owner: 'Team F owner',
+    captainSearch: 'Team F owner',
     color: '#a855f7',
     gradient: 'from-purple-600 to-purple-950',
     logo: '🦅',
@@ -376,7 +376,7 @@ async function main() {
 
   for (const tConfig of OFFICIAL_TEAMS_CONFIG) {
     // Find matching captain player
-    const capPlayer = allPlayersInDb.find(p => 
+    const capPlayer = allPlayersInDb.find(p =>
       p.name.toLowerCase().includes(tConfig.captainSearch)
     );
 

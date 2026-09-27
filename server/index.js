@@ -11,6 +11,7 @@ import rulesRouter from './routes/rules.js';
 import matchesRouter from './routes/matches.js';
 import authRouter from './routes/auth.js';
 import geminiRouter from './routes/gemini.js';
+import settingsRouter from './routes/settings.js';
 import Rule from './models/Rule.js';
 import Team from './models/Team.js';
 import { DEFAULT_RULES } from './data/defaultRules.js';
@@ -53,6 +54,7 @@ app.use('/api/history', historyRouter);
 app.use('/api/rules', rulesRouter);
 app.use('/api/matches', matchesRouter);
 app.use('/api/gemini', geminiRouter);
+app.use('/api/settings', settingsRouter);
 
 // ── Interactive API Documentation (OpenAPI 3.0 / Swagger UI & Redoc) ─────────
 app.use('/api/docs', serveSwaggerUi, setupSwaggerUi);
@@ -116,6 +118,16 @@ app.use((req, res, next) => {
 });
 
 // ── Start Express + Socket.io Server (Render compatibility) ──────────────────
+httpServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n⚠️  Port ${PORT} is already in use by another process.`);
+    console.error(`👉  To free port ${PORT}, run: kill -9 $(lsof -t -i :${PORT}) or npx kill-port ${PORT}\n`);
+    process.exit(1);
+  } else {
+    throw err;
+  }
+});
+
 httpServer.listen(PORT, () => {
   console.log(`\n🚀  NEPL Server + Live Socket Stream running on port ${PORT}`);
   console.log(`📖  Interactive API Docs available at http://localhost:${PORT}/api/docs`);

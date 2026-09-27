@@ -3,13 +3,14 @@ import AuctionState from './models/AuctionState.js';
 import Player from './models/Player.js';
 import Team from './models/Team.js';
 import BidHistory from './models/BidHistory.js';
+import Settings from './models/Settings.js';
 
 let ioInstance = null;
 
 // In-memory fallback / cache for high-speed live auction streaming
 let liveState = {
   activePlayerId: null,
-  currentBid: 500,
+  currentBid: 0,   // 0 = neutral; real value set when first player is selected
   highBidder: null,
   status: 'idle', // 'idle' | 'bidding' | 'sold' | 'unsold'
 };
@@ -42,7 +43,7 @@ async function persistLiveState() {
         highBidder: liveState.highBidder || { id: null, name: null, color: null, logo: null },
         status: liveState.status,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   } catch (err) {
     console.warn('⚠️ [Socket] Error persisting live auction state:', err.message);
@@ -88,12 +89,22 @@ export function setupSocket(httpServer) {
 
     // 3. Auctioneer / Super Admin selects active player for the block
     socket.on('auction:selectPlayer', async (data) => {
-      const { playerId, basePrice = 500 } = data || {};
+      const { playerId } = data || {};
       if (!playerId) return;
+
+      let effectiveBase = Number(data?.basePrice);
+      if (!effectiveBase || isNaN(effectiveBase) || effectiveBase <= 0) {
+        try {
+          const s = await Settings.findOne({ id: 'tournament_settings' }).lean();
+          effectiveBase = Number(s?.defaultBasePrice) || 100;
+        } catch {
+          effectiveBase = 100;
+        }
+      }
 
       liveState = {
         activePlayerId: playerId,
-        currentBid: Number(basePrice) || 500,
+        currentBid: effectiveBase,
         highBidder: null,
         status: 'bidding',
       };
@@ -217,6 +228,9 @@ export function setupSocket(httpServer) {
 
       liveState.status = 'unsold';
       liveState.highBidder = null;
+      if (player?.basePrice) {
+        liveState.currentBid = Number(player.basePrice);
+      }
       await persistLiveState();
 
       try {
@@ -246,10 +260,20 @@ export function setupSocket(httpServer) {
       });
     });
 
-    // 7. Super Admin: Revoke Bid
+    // 7. Super Admin: Revoke Bid — reset currentBid to player's base price (falls back to settings defaultBasePrice)
     socket.on('auction:adminRevokeBid', async (data) => {
       const { playerId, basePrice, logItem } = data || {};
-      liveState.currentBid = Number(basePrice) || 500;
+      // Use the player's actual base price; if missing, fall back to settings
+      let fallbackBase = Number(basePrice);
+      if (!fallbackBase || isNaN(fallbackBase) || fallbackBase <= 0) {
+        try {
+          const s = await Settings.findOne({ id: 'tournament_settings' }).lean();
+          fallbackBase = Number(s?.defaultBasePrice) || 100;
+        } catch {
+          fallbackBase = 100;
+        }
+      }
+      liveState.currentBid = fallbackBase;
       liveState.highBidder = null;
       await persistLiveState();
 
@@ -307,15 +331,64 @@ export function setupSocket(httpServer) {
 
     // 9. Full Data Reset
     socket.on('auction:dataReset', async () => {
+      let resetBase = 0;
+      try {
+        const s = await Settings.findOne({ id: 'tournament_settings' }).lean();
+        resetBase = Number(s?.defaultBasePrice) || 0;
+      } catch {
+        resetBase = 0;
+      }
       liveState = {
         activePlayerId: null,
-        currentBid: 500,
+        currentBid: resetBase,
         highBidder: null,
         status: 'idle',
       };
       await persistLiveState();
       console.log('🔄 [Socket] Auction data reset broadcasted');
       io.emit('auction:dataReset');
+    });
+
+    // 10. Tournament Brand Settings Update
+    socket.on('settings:update', async (newSettings) => {
+      try {
+        if (newSettings && newSettings.tournamentName) {
+          const updated = await Settings.findOneAndUpdate(
+            { id: 'tournament_settings' },
+            {
+              $set: {
+                tournamentName: String(newSettings.tournamentName).trim(),
+                subtitle: newSettings.subtitle ? String(newSettings.subtitle).trim() : 'Box Cricket League',
+                shortCode: newSettings.shortCode ? String(newSettings.shortCode).trim() : 'NEPL',
+                edition: newSettings.edition ? String(newSettings.edition).trim() : '2026',
+                logoUrl: newSettings.logoUrl ? String(newSettings.logoUrl).trim() : '/nyati_era_logo.png',
+                defaultBasePrice: newSettings.defaultBasePrice !== undefined ? Math.max(1, Number(newSettings.defaultBasePrice) || 100) : 100,
+                bidIncrementStep: newSettings.bidIncrementStep !== undefined ? Math.max(1, Number(newSettings.bidIncrementStep) || 100) : 100,
+                startupPurse: newSettings.startupPurse !== undefined ? Math.max(100, Number(newSettings.startupPurse) || 10000) : 10000,
+                updatedAt: new Date(),
+              }
+            },
+            { upsert: true, returnDocument: 'after' }
+          );
+          console.log('🏆 [Socket] Tournament brand & bidding rules updated:', updated.tournamentName, 'Base Price:', updated.defaultBasePrice, 'Startup Purse:', updated.startupPurse);
+          io.emit('settings:sync', updated);
+
+          // If active player has no bids yet, synchronize current bid to updated defaultBasePrice
+          if (liveState.activePlayerId && !liveState.highBidder && liveState.status === 'bidding') {
+            liveState.currentBid = updated.defaultBasePrice;
+            await persistLiveState();
+            io.emit('auction:playerSelected', {
+              activePlayerId: liveState.activePlayerId,
+              currentBid: liveState.currentBid,
+              highBidder: null,
+              status: 'bidding',
+            });
+            console.log(`📢 [Socket] Synced active player base bid to updated base ₹${liveState.currentBid}`);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ [Socket] Error updating tournament settings:', err.message);
+      }
     });
 
     socket.on('disconnect', () => {
@@ -331,3 +404,5 @@ export function setupSocket(httpServer) {
 export function getIo() {
   return ioInstance;
 }
+
+export const getIoInstance = getIo;

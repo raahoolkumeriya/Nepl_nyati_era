@@ -6,13 +6,20 @@ import {
 } from 'lucide-react';
 import { TOURNAMENT_RULES } from '../data/initialData';
 import { useAuth } from '../auth/AuthContext';
+import { useTournament } from '../context/TournamentContext';
 import { addRule as apiAddRule, deleteRule as apiDeleteRule, isMongoDB } from '../services/api';
 import NEFLFormatView from './NEFLFormatView';
 
 export default function RulesHub({ rules = TOURNAMENT_RULES, setRules, onOpenAiChat }) {
   const { user, can } = useAuth();
+  const { tournamentSettings } = useTournament();
   const isSuperAdmin = user?.role === 'superuser';
   const canManage = isSuperAdmin || can('canResetData') || can('canManageUsers');
+
+  const tourName = tournamentSettings?.tournamentName || 'Nyati Era';
+  const tourShort = tournamentSettings?.shortCode || 'NEPL';
+  const tourSubtitle = tournamentSettings?.subtitle || 'Premiere League';
+  const tourEdition = tournamentSettings?.edition || `${new Date().getFullYear()} Season`;
 
   // Format Tab: 'nefl' (NEFL 2026 Summer Season) or 'standard' (Standard Rulebook)
   const [activeFormatTab, setActiveFormatTab] = useState('nefl');
@@ -176,7 +183,7 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules, onOpenAiC
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span>NEPL (Nyati Era Premiere League) {new Date().getFullYear()} Season</span>
+            <span>{tourName} Tournament Format</span>
           </button>
 
           <button
@@ -226,10 +233,10 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules, onOpenAiC
                 </div>
 
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-sand-100 tracking-tight font-sans">
-                  NEPL Tournament Guidelines & Rules
+                  {tourName} Tournament Guidelines & Rules
                 </h2>
                 <p className="text-sand-500 text-xs mt-2 max-w-2xl">
-                  Official rules for Nyati Era Box Cricket League. Stored live in MongoDB Atlas table. All team captains, owners, and players must strictly abide by these directives.
+                  Official rules for {tourName} {tourSubtitle}. Stored live in database. All team captains, owners, and players must strictly abide by these directives.
                 </p>
               </div>
 
@@ -326,26 +333,26 @@ export default function RulesHub({ rules = TOURNAMENT_RULES, setRules, onOpenAiC
             </div>
             <div>
               <h4 className="font-extrabold text-sand-100 text-sm flex items-center gap-2 font-display">
-                Official Tiered Bidding Increments
+                Official Bidding Rules & Escalation
                 <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] uppercase tracking-wider border border-cyan-500/40">Live Rule</span>
               </h4>
               <p className="text-xs text-sand-400 mt-0.5">
-                Bidding increments scale dynamically based on the player's current high bid price:
+                Dynamic auction rules set by Supreme Master and synchronized live across all devices:
               </p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2.5 text-center font-mono text-xs shrink-0">
             <div className="p-2.5 rounded-xl bg-warm-900/90 border border-emerald-500/30">
-              <span className="text-[10px] text-sand-400 block">Up to ₹1,000</span>
-              <span className="text-emerald-400 font-black">+₹100 PTS</span>
+              <span className="text-[10px] text-sand-400 block">Default Base Price</span>
+              <span className="text-emerald-400 font-black">₹{(tournamentSettings?.defaultBasePrice || 100).toLocaleString()} PTS</span>
             </div>
             <div className="p-2.5 rounded-xl bg-warm-900/90 border border-cyan-500/30">
-              <span className="text-[10px] text-sand-400 block">₹1,000 – ₹3,000</span>
-              <span className="text-cyan-300 font-black">+₹200 PTS</span>
+              <span className="text-[10px] text-sand-400 block">Bid Increment Step</span>
+              <span className="text-cyan-300 font-black">+₹{(tournamentSettings?.bidIncrementStep || 100).toLocaleString()} PTS</span>
             </div>
             <div className="p-2.5 rounded-xl bg-warm-900/90 border border-amber-500/30">
-              <span className="text-[10px] text-sand-400 block">Above ₹3,000</span>
-              <span className="text-amber-300 font-black">+₹300 PTS+</span>
+              <span className="text-[10px] text-sand-400 block">Startup Team Purse</span>
+              <span className="text-amber-300 font-black">₹{(tournamentSettings?.startupPurse || 10000).toLocaleString()} PTS</span>
             </div>
           </div>
         </div>

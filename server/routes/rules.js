@@ -45,7 +45,7 @@ router.put('/:id', async (req, res) => {
     const rule = await Rule.findOneAndUpdate(
       { id: req.params.id },
       { $set: req.body },
-      { new: true, upsert: true, lean: true }
+      { returnDocument: 'after', upsert: true, lean: true }
     );
     const { _id, __v, ...r } = rule;
     res.json(r);

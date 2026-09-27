@@ -11,15 +11,84 @@
 
 :root {
   color-scheme: dark;
+  --color-primary: #cc785c;
+  --color-accent: #d97706;
+  --color-cyan: #00f2fe;
+  --color-emerald: #10b981;
+  --color-bg-dark: #141413;
+  --color-bg-light: #faf9f5;
+  --color-text-dark: #f3f1eb;
+  --color-text-light: #0f172a;
+  --glass-border: color-mix(in srgb, currentColor 10%, transparent);
+  --glass-bg: color-mix(in srgb, #141413 86%, transparent);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(204, 120, 92, 0.4) transparent;
 }
 
 html {
+  font-size: clamp(15.5px, 1.05vw, 19px);
+  line-height: 1.5;
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  scrollbar-gutter: stable;
+  font-variant-numeric: tabular-nums;
 }
+
+@media (min-width: 1440px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+/* 4K & TV Projector Modern High-DPI Scaling */
+@media (min-width: 1920px) {
+  html {
+    font-size: 18.5px;
+  }
+}
+
+@media (min-width: 2560px) {
+  html {
+    font-size: 20px;
+  }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary, #cc785c);
+  outline-offset: 2px;
+}
+
+input:user-invalid, select:user-invalid, textarea:user-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35) !important;
+}
+
+/* Elevate legacy microscopic fonts into comfortable modern viewing sizes */
+.text-\[8px\], .text-\[9px\] {
+  font-size: 0.72rem !important; /* ~11.5px */
+  line-height: 1.15 !important;
+}
+
+.text-\[10px\] {
+  font-size: 0.785rem !important; /* ~12.5px */
+  line-height: 1.25 !important;
+}
+
+.text-\[11px\] {
+  font-size: 0.835rem !important; /* ~13.4px */
+  line-height: 1.3 !important;
+}
+
 
 body {
   background-color: #141413;
@@ -554,14 +623,310 @@ body, p, label, .font-sans {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.98);
   }
   to {
     opacity: 1;
-    transform: scale(1.05);
+    transform: scale(1);
   }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. APPLE LIQUID GLASS (VISIONOS / SONOMA LIQUID GLASSMORPHISM)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes liquidFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0.4deg);
+  }
+}
+
+.apple-liquid-glass {
+  position: relative;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(15, 23, 42, 0.58) 32%,
+    rgba(6, 11, 24, 0.88) 100%
+  );
+  backdrop-filter: blur(48px) saturate(210%);
+  -webkit-backdrop-filter: blur(48px) saturate(210%);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-left: 1.5px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 4px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 35px rgba(0, 242, 254, 0.06),
+    0 35px 85px -15px rgba(0, 0, 0, 0.85),
+    0 0 60px rgba(0, 242, 254, 0.14);
+}
+
+.apple-liquid-glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1.5px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.7) 25%,
+    rgba(0, 242, 254, 0.85) 50%,
+    rgba(255, 255, 255, 0.7) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.8));
+}
+
+.apple-liquid-pod {
+  position: relative;
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.1) 28%,
+    rgba(14, 28, 54, 0.72) 65%,
+    rgba(6, 12, 24, 0.95) 100%
+  );
+  backdrop-filter: blur(32px) saturate(220%);
+  -webkit-backdrop-filter: blur(32px) saturate(220%);
+  border: 1.5px solid rgba(255, 255, 255, 0.24);
+  border-top-color: rgba(255, 255, 255, 0.65);
+  border-left-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 
+    inset 0 2px 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 4px 0 rgba(0, 0, 0, 0.65),
+    inset 0 0 25px rgba(0, 242, 254, 0.3),
+    0 24px 50px -10px rgba(0, 0, 0, 0.75),
+    0 0 45px rgba(0, 242, 254, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+}
+
+.apple-liquid-pod:hover {
+  transform: translateY(-4px) scale(1.04);
+  box-shadow: 
+    inset 0 2.5px 3px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 5px 0 rgba(0, 0, 0, 0.7),
+    inset 0 0 35px rgba(0, 242, 254, 0.5),
+    0 30px 65px -10px rgba(0, 0, 0, 0.85),
+    0 0 65px rgba(0, 242, 254, 0.65);
+}
+
+.apple-liquid-pod-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.08) 32%,
+    transparent 52%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.apple-liquid-input {
+  background: rgba(8, 14, 28, 0.75);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 
+    inset 0 2px 4px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-liquid-input:focus {
+  background: rgba(12, 20, 38, 0.9);
+  border-color: rgba(0, 242, 254, 0.65);
+  border-top-color: rgba(0, 242, 254, 0.85);
+  box-shadow: 
+    inset 0 2px 4px 0 rgba(0, 0, 0, 0.45),
+    0 0 0 3px rgba(0, 242, 254, 0.18),
+    0 0 20px rgba(0, 242, 254, 0.25);
+}
+
+.apple-liquid-tile {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(15, 23, 42, 0.5) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 24px -4px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-liquid-tile:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(20, 30, 55, 0.65) 100%
+  );
+  border-color: rgba(0, 242, 254, 0.35);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 12px 28px -4px rgba(0, 0, 0, 0.55),
+    0 0 20px rgba(0, 242, 254, 0.2);
+}
+
+.light .apple-liquid-glass {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(247, 245, 240, 0.88) 100%
+  ) !important;
+  border-color: rgba(226, 218, 204, 0.85) !important;
+  border-top-color: rgba(255, 255, 255, 1) !important;
+  box-shadow: 
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 25px 60px -15px rgba(20, 20, 19, 0.12),
+    0 0 30px rgba(204, 120, 92, 0.08) !important;
+}
+
+.light .apple-liquid-pod {
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(244, 239, 230, 0.92) 100%
+  ) !important;
+  border-color: rgba(226, 218, 204, 0.9) !important;
+  border-top-color: rgba(255, 255, 255, 1) !important;
+  box-shadow: 
+    inset 0 2px 3px 0 rgba(255, 255, 255, 1),
+    0 15px 35px -10px rgba(20, 20, 19, 0.12) !important;
+}
+
+.light .apple-liquid-glass::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 1) 30%,
+    rgba(204, 120, 92, 0.45) 50%,
+    rgba(255, 255, 255, 1) 70%,
+    transparent 100%
+  ) !important;
+  filter: drop-shadow(0 0 3px rgba(204, 120, 92, 0.3)) !important;
+}
+
+.light .apple-liquid-input {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid #dcd3c4 !important;
+  border-top-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 2px rgba(20, 20, 19, 0.05) !important;
+}
+
+.light .apple-liquid-input:focus {
+  background: #ffffff !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18), inset 0 1px 2px rgba(20, 20, 19, 0.04) !important;
+}
+
+.light .apple-liquid-tile {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid #e2dacc !important;
+  border-top-color: #ffffff !important;
+  box-shadow: 0 4px 14px -2px rgba(20, 20, 19, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+}
+
+.light .apple-liquid-tile:hover {
+  background: #ffffff !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 8px 20px -3px rgba(20, 20, 19, 0.09), 0 0 15px rgba(2, 132, 199, 0.12) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODERN WEB GUIDANCE: VIEW TRANSITIONS & SCROLL-DRIVEN MOTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* View Transitions API (Progressive Enhancement) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: vt-fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: vt-fade-in;
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.995); }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; transform: scale(1.005); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Native CSS Scroll-Driven Progress Bar */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    @keyframes grow-scroll-progress {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+
+    #scroll-progress {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg in oklch, #cc785c, #d97706, #00f2fe);
+      transform-origin: 0 50%;
+      animation: grow-scroll-progress auto linear;
+      animation-timeline: scroll();
+      z-index: 9999;
+      pointer-events: none;
+    }
+  }
+}
+
+/* Accessibility: User Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Off-screen Content Performance */
+.virtual-pool-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
+

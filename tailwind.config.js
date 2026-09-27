@@ -12,6 +12,20 @@ export default {
         '3xl': '1792px',
         '4xl': '2160px',
       },
+      fontSize: {
+        '2xs': ['0.75rem', { lineHeight: '1rem' }],        // 12px min
+        'xs': ['0.8125rem', { lineHeight: '1.125rem' }],   // 13px (was 12px)
+        'sm': ['0.9375rem', { lineHeight: '1.375rem' }],   // 15px (was 14px)
+        'base': ['1.0625rem', { lineHeight: '1.625rem' }], // 17px (was 16px)
+        'lg': ['1.1875rem', { lineHeight: '1.75rem' }],    // 19px (was 18px)
+        'xl': ['1.3125rem', { lineHeight: '1.875rem' }],   // 21px (was 20px)
+        '2xl': ['1.625rem', { lineHeight: '2.125rem' }],   // 26px (was 24px)
+        '3xl': ['2rem', { lineHeight: '2.5rem' }],         // 32px (was 30px)
+        '4xl': ['2.5rem', { lineHeight: '2.875rem' }],      // 40px (was 36px)
+        '5xl': ['3.25rem', { lineHeight: '1.1' }],         // 52px (was 48px)
+        '6xl': ['4rem', { lineHeight: '1.05' }],           // 64px (was 60px)
+        '7xl': ['5rem', { lineHeight: '1' }],              // 80px (was 72px)
+      },
       colors: {
         cyber: {
           950: '#050811',

@@ -33,7 +33,7 @@ router.put('/:id', async (req, res) => {
     const team = await Team.findOneAndUpdate(
       { id: req.params.id },
       { $set: req.body },
-      { new: true, upsert: true, lean: true }
+      { returnDocument: 'after', upsert: true, lean: true }
     );
     const { _id, __v, ...t } = team;
     res.json(t);

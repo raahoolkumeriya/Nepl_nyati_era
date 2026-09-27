@@ -92,16 +92,18 @@ Go to **Atlas → Network Access** and add your IP address (or `0.0.0.0/0` for d
 
 ---
 
-## Auth Credentials
+## Auth & Role Configuration
 
-| Role | Email | Password | Permissions |
+Role credentials are securely managed through environment variables in your private `.env` file:
+
+| Role | Default Email | Password Environment Variable | Permissions |
 |---|---|---|---|
-| ⚡ Super Admin | `admin@nepl.in` | `Super@dmin2026` | Live Bidding, Sell/Unsell, Team & User Management, Projector |
-| 🔨 Auctioneer | `auction@nepl.in` | `Auction@2026` | Live Bidding, View Teams & Players, Projector |
-| 🏏 Player | `player@nepl.in` | `Player@2026` | View Teams, Players, Rules & Schedule |
-| 👑 Dev Master | `developer@nepl.in` | `Supreme@Dev2026` | Full System Reset & Dev Management |
+| 👑 Dev Master | `developer@nepl.in` | `VITE_SUPREMEMASTER_PASS` | Full System Reset & Dev Management |
+| ⚡ Super Admin | `admin@nepl.in` | `VITE_SUPERUSER_PASS` | Live Bidding, Sell/Unsell, Team & User Management, Projector |
+| 🔨 Auctioneer | `auction@nepl.in` | `VITE_AUCTIONEER_PASS` | Live Bidding, View Teams & Players, Projector |
+| 🏏 Player | `player@nepl.in` | `VITE_PLAYER_PASS` | View Teams, Players, Rules & Schedule |
 
-> **Tip:** On the Login Screen (`http://localhost:5173`), you can simply click on any of the account cards to autofill both email and password instantly.
+> **Security Note:** Passwords are never hardcoded in source code files. Configure your secret passwords in your private `.env` file (which is git-ignored). In local/demo environments, clicking any profile tile on the login page autofills credentials directly from your `.env` configuration.
 
 ---
 

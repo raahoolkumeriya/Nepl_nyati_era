@@ -87,6 +87,10 @@ class SoundFX {
     osc.stop(this.ctx.currentTime + 0.4);
   }
 
+  playPass() {
+    this.playUnsold();
+  }
+
   playHammer() {
     if (!this.enabled) return;
     this.init();

@@ -15,15 +15,15 @@ export const ROLES = {
     textColor: 'text-purple-300',
     borderColor: 'border-purple-500/40',
     permissions: {
-      canBid: false,
-      canSellPlayer: false,
-      canUnsellPlayer: false,
-      canOverrideBid: false,
-      canEditPlayers: false,
-      canAddPlayers: false,
-      canDeletePlayers: false,
+      canBid: true,
+      canSellPlayer: true,
+      canUnsellPlayer: true,
+      canOverrideBid: true,
+      canEditPlayers: true,
+      canAddPlayers: true,
+      canDeletePlayers: true,
       canResetData: true, // EXCLUSIVELY Supreme Master can clear live auction data from MongoDB Atlas!
-      canManageTeams: false,
+      canManageTeams: true,
       canManageUsers: true,
       canViewAuction: true,
       canViewTeams: true,
@@ -31,6 +31,8 @@ export const ROLES = {
       canViewRules: true,
       canViewSchedule: true,
       canAccessProjector: true,
+      canViewApiDocs: true,
+      canViewCricHeroes: true,
     }
   },
   superuser: {
@@ -55,8 +57,10 @@ export const ROLES = {
       canViewTeams: true,
       canViewPlayers: true,
       canViewRules: true,
-      canViewSchedule: true,
+      canViewSchedule: false,
       canAccessProjector: true,
+      canViewApiDocs: false,
+      canViewCricHeroes: false,
     }
   },
   auctioneer: {
@@ -68,9 +72,9 @@ export const ROLES = {
     borderColor: 'border-amber-500/40',
     permissions: {
       canBid: true,
-      canSellPlayer: false, // Super Admin Only
-      canUnsellPlayer: false,
-      canOverrideBid: false,
+      canSellPlayer: true,
+      canUnsellPlayer: true,
+      canOverrideBid: true,
       canEditPlayers: false,
       canAddPlayers: false,
       canDeletePlayers: false,
@@ -81,8 +85,10 @@ export const ROLES = {
       canViewTeams: true,
       canViewPlayers: true,
       canViewRules: true,
-      canViewSchedule: true,
+      canViewSchedule: false,
       canAccessProjector: true,
+      canViewApiDocs: false,
+      canViewCricHeroes: false,
     }
   },
   player: {
@@ -107,8 +113,10 @@ export const ROLES = {
       canViewTeams: true,
       canViewPlayers: true,
       canViewRules: true,
-      canViewSchedule: true,
+      canViewSchedule: false,
       canAccessProjector: false,
+      canViewApiDocs: false,
+      canViewCricHeroes: false,
     }
   }
 };
@@ -118,7 +126,7 @@ export const DEFAULT_CREDENTIALS = [
   {
     id: 'usr-supreme-master-default',
     email: (import.meta.env.VITE_SUPREMEMASTER_EMAIL || '').trim().toLowerCase() || 'developer@nepl.in',
-    password: (import.meta.env.VITE_SUPREMEMASTER_PASS || 'Supreme@Dev2026').trim(),
+    password: (import.meta.env.VITE_SUPREMEMASTER_PASS || '').trim(),
     role: 'suprememaster',
     name: 'Supreme Master (App Developer)',
     avatar: '👑',
@@ -129,7 +137,7 @@ export const DEFAULT_CREDENTIALS = [
   {
     id: 'usr-admin-default',
     email: (import.meta.env.VITE_SUPERUSER_EMAIL || '').trim().toLowerCase() || 'admin@nepl.in',
-    password: (import.meta.env.VITE_SUPERUSER_PASS || 'Super@dmin2026').trim(),
+    password: (import.meta.env.VITE_SUPERUSER_PASS || '').trim(),
     role: 'superuser',
     name: 'Super Admin',
     avatar: '⚡',
@@ -140,7 +148,7 @@ export const DEFAULT_CREDENTIALS = [
   {
     id: 'usr-auction-default',
     email: (import.meta.env.VITE_AUCTIONEER_EMAIL || '').trim().toLowerCase() || 'auction@nepl.in',
-    password: (import.meta.env.VITE_AUCTIONEER_PASS || 'Auction@2026').trim(),
+    password: (import.meta.env.VITE_AUCTIONEER_PASS || '').trim(),
     role: 'auctioneer',
     name: 'Auction Member',
     avatar: '🔨',
@@ -151,7 +159,7 @@ export const DEFAULT_CREDENTIALS = [
   {
     id: 'usr-player-default',
     email: (import.meta.env.VITE_PLAYER_EMAIL || '').trim().toLowerCase() || 'player@nepl.in',
-    password: (import.meta.env.VITE_PLAYER_PASS || 'Player@2026').trim(),
+    password: (import.meta.env.VITE_PLAYER_PASS || '').trim(),
     role: 'player',
     name: 'Player',
     avatar: '🏏',
@@ -317,7 +325,7 @@ export function addAuctioneer({ name, email, password, role = 'auctioneer', phot
       updatedUser = {
         id: `usr-${Date.now()}`,
         email: cleanEmail,
-        password: password ? password.trim() : (import.meta.env.VITE_AUCTIONEER_PASS || 'Auction@2026').trim(),
+        password: password ? password.trim() : (import.meta.env.VITE_AUCTIONEER_PASS || '').trim(),
         role,
         name: name.trim(),
         avatar,
@@ -509,6 +517,7 @@ export async function validateCredentials(email, password) {
  */
 export function hasPermission(user, permission) {
   if (!user || user.isDisabled) return false;
+  if (user.role === 'suprememaster') return true;
   const roleConfig = ROLES[user.role];
   if (!roleConfig) return false;
   return roleConfig.permissions[permission] === true;

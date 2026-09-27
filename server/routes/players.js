@@ -58,7 +58,7 @@ router.put('/:id', async (req, res) => {
     const player = await Player.findOneAndUpdate(
       { id: req.params.id },
       { $set: req.body },
-      { new: true, upsert: true, lean: true }
+      { returnDocument: 'after', upsert: true, lean: true }
     );
     const { _id, __v, ...p } = player;
     res.json(p);

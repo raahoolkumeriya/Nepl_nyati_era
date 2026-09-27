@@ -1,45 +1,60 @@
 /**
  * Utility functions for calculating dynamic auction bid increments and slab tiers.
- * 
- * Bidding Tier Rules:
- * - Up to 1000 PTS: +100 PTS increment
- * - 1000 to <3000 PTS: +200 PTS increment
- * - 3000 to <5000 PTS: +300 PTS increment
- * - 5000 to <7000 PTS: +400 PTS increment
- * - Scaling +100 for every additional 2000 PTS threshold.
+ *
+ * Priority:
+ * 1. Explicit customStep set by Supreme Master (bidIncrementStep) — used for all increments
+ * 2. If no customStep, fall back to dynamic tier based on currentBid value
+ *
+ * NOTE: basePrice is the STARTING BID AMOUNT — it is NOT the increment step.
+ *       e.g. Base=10000, Step=10000 → bids go 10000 → 20000 → 30000 (each step +10000)
+ *       e.g. Base=10000, Step=5000  → bids go 10000 → 15000 → 20000 (each step +5000)
  */
 
-export function getBidIncrement(currentBid) {
+export function getBidIncrement(currentBid, customStep = null, basePrice = null) {
+  // Explicit custom step set by Supreme Master always wins for increments
+  const step = Number(customStep);
+  if (step && step > 0) {
+    return step;
+  }
+
+  // Default fallback: dynamic tier based on current bid value
   const bid = Math.max(0, Number(currentBid) || 0);
+  if (bid >= 10000) return 10000;
   if (bid < 1000) return 100;
   return 200 + Math.floor((bid - 1000) / 2000) * 100;
 }
 
-export function getBidSlabInfo(currentBid) {
+export function getBidSlabInfo(currentBid, customStep = null, basePrice = null) {
   const bid = Math.max(0, Number(currentBid) || 0);
-  const increment = getBidIncrement(bid);
-
-  let label = 'Tier 1 (Base)';
-  let rangeText = 'Up to ₹1,000 PTS';
-
-  if (bid >= 1000 && bid < 3000) {
-    label = 'Tier 2 (Mid)';
-    rangeText = '₹1,000 – ₹3,000 PTS';
-  } else if (bid >= 3000 && bid < 5000) {
-    label = 'Tier 3 (High)';
-    rangeText = '₹3,000 – ₹5,000 PTS';
-  } else if (bid >= 5000) {
-    const tierNum = 3 + Math.floor((bid - 3000) / 2000);
-    label = `Tier ${tierNum} (Premium)`;
-    const lower = 1000 + Math.floor((bid - 1000) / 2000) * 2000;
-    const upper = lower + 2000;
-    rangeText = `₹${lower.toLocaleString()} – ₹${upper.toLocaleString()} PTS`;
-  }
+  const increment = getBidIncrement(bid, customStep, basePrice);
 
   return {
     increment,
-    label,
-    rangeText,
+    label: customStep
+      ? `Fixed Step (+₹${increment.toLocaleString()} PTS)`
+      : `Standard Step (+₹${increment.toLocaleString()} PTS)`,
+    rangeText: `Grows with +₹${increment.toLocaleString()} PTS / bid`,
     minNextBid: bid + increment
   };
 }
+
+export function getPlayerStartingBid(player, defaultBasePrice = 100) {
+  if (player && player.basePrice !== undefined && player.basePrice !== null) {
+    const num = Number(player.basePrice);
+    if (!isNaN(num) && num > 0) return num;
+  }
+  const fallback = Number(defaultBasePrice);
+  return (!isNaN(fallback) && fallback > 0) ? fallback : 100;
+}
+
+export function calculateNextBid(currentBid, customStep = null, basePrice = null) {
+  const bid = Math.max(0, Number(currentBid) || 0);
+  const inc = getBidIncrement(bid, customStep, basePrice);
+  return bid + inc;
+}
+
+export function formatPTS(amount) {
+  return `₹${Number(amount || 0).toLocaleString()} PTS`;
+}
+
+

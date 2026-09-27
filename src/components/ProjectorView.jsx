@@ -21,11 +21,13 @@ import {
   Activity,
   BarChart3,
   TrendingUp,
+  Radio,
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
-import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam } from '../services/api';
+import { updatePlayer as apiUpdatePlayer } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
-import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
+import { useTournament } from '../context/TournamentContext';
+import { getBidIncrement, getBidSlabInfo, getPlayerStartingBid } from '../utils/bidding';
 import { calculatePlayerPerformance } from '../utils/playerScore';
 import { 
   getSocket, 
@@ -40,14 +42,33 @@ export default function ProjectorView({
   setPlayers, 
   teams = [], 
   setTeams, 
+  history = [],
   onClose,
   viewerCount = 1,
   liveSocketConnected = false,
 }) {
   const { user, can } = useAuth();
+  const { tournamentSettings } = useTournament();
   const isSuperAdmin = user?.role === 'superuser';
   const canBid = can('canBid');
-  const canSell = can('canSellPlayer');
+  const canSell = can('canSellPlayer') || can('canUnsellPlayer');
+
+  // ── Live Bid Stream State ──────────────────────────────────────────────────
+  const [liveBidFeed, setLiveBidFeed] = useState(() => {
+    return (history || [])
+      .filter(h => h.type === 'BID' || h.type === 'SOLD')
+      .slice(0, 15);
+  });
+  const [latestBidAlert, setLatestBidAlert] = useState(null);
+
+  // Auto dismiss latest bid banner after 6s
+  useEffect(() => {
+    if (!latestBidAlert) return;
+    const timer = setTimeout(() => {
+      setLatestBidAlert(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [latestBidAlert]);
   // ── Player Priority Logic ──────────────────────────────────────────────────
   // Priority: 1. Available -> 2. Unsold -> 3. Sold (Filtered by Playing in NEPL)
   const playingPool = players.filter(p => p.isPlayingNEPL !== false);
@@ -91,7 +112,7 @@ export default function ProjectorView({
     const handlePlayerSelected = (data) => {
       if (data && data.activePlayerId) {
         setSelectedId(data.activePlayerId);
-        setLiveCurrentBid(data.currentBid || 500);
+        setLiveCurrentBid(data.currentBid || tournamentSettings?.defaultBasePrice || 100);
         setLiveHighBidder(null);
       }
     };
@@ -102,20 +123,71 @@ export default function ProjectorView({
         setLiveCurrentBid(data.currentBid);
         setLiveHighBidder(data.highBidder);
         soundFx.playBid();
+
+        const pName = data.logItem?.playerName || players.find(p => p.id === data.playerId)?.name || 'Player';
+        const tName = data.highBidder?.name || data.logItem?.teamName || 'Franchise';
+        const tColor = data.highBidder?.color || data.logItem?.teamColor || '#00f2fe';
+        const amt = data.currentBid;
+        const time = data.logItem?.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        const streamEntry = {
+          id: data.logItem?.id || `${Date.now()}-${Math.random()}`,
+          type: 'BID',
+          playerId: data.playerId,
+          playerName: pName,
+          teamName: tName,
+          teamColor: tColor,
+          amount: amt,
+          timestamp: time,
+        };
+
+        setLiveBidFeed(prev => [streamEntry, ...prev.filter(item => item.id !== streamEntry.id).slice(0, 19)]);
+        setLatestBidAlert(streamEntry);
       }
     };
 
-    const handlePlayerSold = () => {
+    const handlePlayerSold = (data) => {
       soundFx.playSold();
       confetti({
         particleCount: 200,
         spread: 100,
         origin: { y: 0.5 }
       });
+
+      if (data) {
+        const pName = data.player?.name || data.logItem?.playerName || 'Player';
+        const tName = data.team?.name || data.logItem?.teamName || 'Franchise';
+        const tColor = data.team?.color || '#10b981';
+        const amt = data.soldPrice;
+        const time = data.logItem?.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        const soldEntry = {
+          id: `${Date.now()}-sold`,
+          type: 'SOLD',
+          playerId: data.playerId,
+          playerName: pName,
+          teamName: tName,
+          teamColor: tColor,
+          amount: amt,
+          timestamp: time,
+        };
+
+        setLiveBidFeed(prev => [soldEntry, ...prev.slice(0, 19)]);
+        setLatestBidAlert(soldEntry);
+      }
     };
 
-    const handlePlayerUnsold = () => {
+    const handlePlayerUnsold = (data) => {
       soundFx.playUnsold();
+      setLiveHighBidder(null);
+      const unsoldEntry = data?.logItem || {
+        id: Date.now().toString(),
+        type: 'UNSOLD',
+        playerName: data?.player?.name || 'Player',
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      setLiveBidFeed(prev => [unsoldEntry, ...prev.slice(0, 19)]);
+      setLatestBidAlert(unsoldEntry);
     };
 
     const handleBidRevoked = (data) => {
@@ -152,6 +224,7 @@ export default function ProjectorView({
 
   const activePlayer = players.find(p => p.id === selectedId) || defaultPriorityPlayer;
   const isSoldOut = activePlayer?.status === 'sold';
+  const isUnsold = activePlayer?.status === 'unsold';
   const perf = calculatePlayerPerformance(activePlayer);
 
   // Helper to extract captain initials (e.g. Rahul Kumeriya -> RK)
@@ -215,50 +288,97 @@ export default function ProjectorView({
   const leadingTeamObj = activePlayer ? teams.find(t => t.id === (liveHighBidder?.id || activePlayer.leadingTeam)) : null;
   const displayedTeamObj = buyerTeamObj || (liveHighBidder ? (teams.find(t => t.id === liveHighBidder.id) || liveHighBidder) : leadingTeamObj);
 
+  const effectiveBasePrice = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
   const currentBid = activePlayer ? (
-    isSoldOut ? (activePlayer.soldPrice || activePlayer.basePrice) : (liveCurrentBid || activePlayer.currentBid || activePlayer.basePrice)
-  ) : 0;
+    isSoldOut 
+      ? (activePlayer.soldPrice || effectiveBasePrice) 
+      : (liveCurrentBid !== null ? liveCurrentBid : (activePlayer.currentBid || effectiveBasePrice))
+  ) : effectiveBasePrice;
 
   // ── Navigation Handlers ───────────────────────────────────────────────────
-  const currentIndex = players.findIndex(p => p.id === activePlayer?.id);
+  const [navPoolMode, setNavPoolMode] = useState('available'); // 'available' | 'all'
+  const activeNavPool = navPoolMode === 'available'
+    ? (availablePlayers.length > 0 ? availablePlayers : (playingPool.length > 0 ? playingPool : players))
+    : (playingPool.length > 0 ? playingPool : players);
 
-  // Available player pool for seamless profile switching
-  const availablePool = availablePlayers.length > 0 ? availablePlayers : players;
-  const currentAvailableIdx = availablePool.findIndex(p => p.id === activePlayer?.id);
+  const currentNavIdx = activeNavPool.findIndex(p => p.id === activePlayer?.id);
+
+  const handlePrevNav = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (activeNavPool.length === 0) return;
+    const newIdx = currentNavIdx > 0 ? currentNavIdx - 1 : activeNavPool.length - 1;
+    const target = activeNavPool[newIdx];
+    if (target) {
+      setSelectedId(target.id);
+      const startBid = getPlayerStartingBid(target, tournamentSettings?.defaultBasePrice);
+      setLiveCurrentBid(startBid);
+      setLiveHighBidder(null);
+      liveSelectPlayer(target.id, startBid);
+    }
+  };
+
+  const handleNextNav = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (activeNavPool.length === 0) return;
+    const newIdx = currentNavIdx < activeNavPool.length - 1 ? currentNavIdx + 1 : 0;
+    const target = activeNavPool[newIdx];
+    if (target) {
+      setSelectedId(target.id);
+      const startBid = getPlayerStartingBid(target, tournamentSettings?.defaultBasePrice);
+      setLiveCurrentBid(startBid);
+      setLiveHighBidder(null);
+      liveSelectPlayer(target.id, startBid);
+    }
+  };
+
+  // Keyboard navigation for TV presentation clickers & remotes (← and →)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrevNav();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNextNav();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentNavIdx, activeNavPool]);
+
+  // ── Header Player Switcher Handlers ───────────────────────────────────────
+  const currentIndex = players.findIndex(p => p.id === activePlayer?.id);
 
   const handlePrevPlayer = () => {
     if (players.length === 0) return;
     const newIdx = currentIndex > 0 ? currentIndex - 1 : players.length - 1;
     const target = players[newIdx];
-    setSelectedId(target.id);
-    liveSelectPlayer(target.id, target.basePrice);
+    if (target) {
+      setSelectedId(target.id);
+      const startBid = getPlayerStartingBid(target, tournamentSettings?.defaultBasePrice);
+      setLiveCurrentBid(startBid);
+      setLiveHighBidder(null);
+      liveSelectPlayer(target.id, startBid);
+    }
   };
 
   const handleNextPlayer = () => {
     if (players.length === 0) return;
     const newIdx = currentIndex < players.length - 1 ? currentIndex + 1 : 0;
     const target = players[newIdx];
-    setSelectedId(target.id);
-    liveSelectPlayer(target.id, target.basePrice);
+    if (target) {
+      setSelectedId(target.id);
+      const startBid = getPlayerStartingBid(target, tournamentSettings?.defaultBasePrice);
+      setLiveCurrentBid(startBid);
+      setLiveHighBidder(null);
+      liveSelectPlayer(target.id, startBid);
+    }
   };
 
-  const handlePrevAvailablePlayer = (e) => {
-    if (e) e.stopPropagation();
-    if (availablePool.length === 0) return;
-    const newIdx = currentAvailableIdx > 0 ? currentAvailableIdx - 1 : availablePool.length - 1;
-    const target = availablePool[newIdx];
-    setSelectedId(target.id);
-    liveSelectPlayer(target.id, target.basePrice);
-  };
-
-  const handleNextAvailablePlayer = (e) => {
-    if (e) e.stopPropagation();
-    if (availablePool.length === 0) return;
-    const newIdx = currentAvailableIdx < availablePool.length - 1 ? currentAvailableIdx + 1 : 0;
-    const target = availablePool[newIdx];
-    setSelectedId(target.id);
-    liveSelectPlayer(target.id, target.basePrice);
-  };
+  // Backward compatibility alias for side navigation
+  const handlePrevAvailablePlayer = handlePrevNav;
+  const handleNextAvailablePlayer = handleNextNav;
 
   // ── Quick Bid Handler ─────────────────────────────────────────────────────
   const handleQuickBid = (team, customIncrement) => {
@@ -270,11 +390,14 @@ export default function ProjectorView({
       return;
     }
 
-    const curBid = activePlayer.currentBid || activePlayer.basePrice || 0;
-    const increment = customIncrement || getBidIncrement(curBid);
+    const effectiveBase = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+    const hasBids = Boolean(liveHighBidder || (activePlayer.leadingTeam && (activePlayer.currentBid > effectiveBase || (liveCurrentBid && liveCurrentBid > effectiveBase))));
+    const curBid = liveCurrentBid || activePlayer.currentBid || effectiveBase;
+    const increment = getBidIncrement(curBid, tournamentSettings?.bidIncrementStep, effectiveBase);
     if (!increment || isNaN(increment) || increment <= 0) return;
 
-    const nextBid = curBid + increment;
+    // First bid starts strictly at Base Price (e.g. 10,000); subsequent bids increment by custom step
+    const nextBid = hasBids ? (curBid + increment) : effectiveBase;
 
     if (nextBid <= 0) {
       alert("⚠️ Invalid Bid: Bidding amount must be a positive number greater than 0!");
@@ -304,8 +427,9 @@ export default function ProjectorView({
       return p;
     }));
 
-    livePlaceBid(activePlayer.id, team, nextBid, {
+    const logItem = {
       id: Date.now().toString(),
+      type: 'BID',
       playerId: activePlayer.id,
       playerName: activePlayer.name,
       teamId: team.id,
@@ -313,7 +437,11 @@ export default function ProjectorView({
       teamColor: team.color,
       amount: nextBid,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    });
+    };
+
+    livePlaceBid(activePlayer.id, team, nextBid, logItem);
+    setLiveBidFeed(prev => [logItem, ...prev.slice(0, 19)]);
+    setLatestBidAlert(logItem);
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -344,7 +472,7 @@ export default function ProjectorView({
       origin: { y: 0.5 }
     });
 
-    const finalPrice = activePlayer.currentBid || activePlayer.basePrice;
+    const finalPrice = liveCurrentBid || activePlayer.currentBid || activePlayer.basePrice || tournamentSettings?.defaultBasePrice || 100;
 
     const updatedPlayer = {
       ...activePlayer,
@@ -380,6 +508,17 @@ export default function ProjectorView({
     liveMarkSold(activePlayer.id, buyerTeam.id, finalPrice, updatedPlayer, updatedTeam, soldLogItem);
 
     setTimeout(() => {
+      const nextAvailable = playingPool.find(p => p.id !== activePlayer.id && p.status === 'available');
+      const nextUnsold = playingPool.find(p => p.id !== activePlayer.id && p.status === 'unsold');
+      const nextTarget = nextAvailable || nextUnsold;
+
+      setLiveHighBidder(null);
+      if (nextTarget) {
+        setSelectedId(nextTarget.id);
+        const nextPrice = getPlayerStartingBid(nextTarget, tournamentSettings?.defaultBasePrice);
+        setLiveCurrentBid(nextPrice);
+        liveSelectPlayer(nextTarget.id, nextPrice);
+      }
       setIsProcessing(false);
     }, 1200);
   };
@@ -387,16 +526,26 @@ export default function ProjectorView({
   // ── Mark Unsold Handler ───────────────────────────────────────────────────
   const handleMarkUnsold = () => {
     if (!activePlayer || isSoldOut) return;
-    if (!window.confirm(`Mark "${activePlayer.name}" as Unsold in NEPL Auction Pool?`)) return;
     
-    soundFx.playPass();
+    try {
+      soundFx.playUnsold();
+    } catch (e) {
+      console.warn('Audio play error:', e);
+    }
+
+    const startPrice = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
     const updated = {
       ...activePlayer,
       status: 'unsold',
-      currentBid: activePlayer.basePrice,
+      soldPrice: 0,
+      soldTo: null,
+      currentBid: startPrice,
       leadingTeam: null
     };
-    setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+
+    if (typeof setPlayers === 'function') {
+      setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+    }
     apiUpdatePlayer(activePlayer.id, updated).catch(err => console.warn('MongoDB unsold update error:', err));
     
     const unsoldLogItem = {
@@ -406,19 +555,39 @@ export default function ProjectorView({
       timestamp: new Date().toLocaleTimeString()
     };
     liveMarkUnsold(activePlayer.id, updated, unsoldLogItem);
+
+    setLiveHighBidder(null);
+
+    // Auto advance to next available/unsold player in pool
+    const pool = playingPool.length > 0 ? playingPool : players;
+    const nextAvailable = pool.find(p => p.id !== activePlayer.id && p.status === 'available');
+    const nextUnsold = pool.find(p => p.id !== activePlayer.id && p.status === 'unsold');
+    const nextTarget = nextAvailable || nextUnsold;
+
+    if (nextTarget) {
+      setSelectedId(nextTarget.id);
+      const nextPrice = getPlayerStartingBid(nextTarget, tournamentSettings?.defaultBasePrice);
+      setLiveCurrentBid(nextPrice);
+      liveSelectPlayer(nextTarget.id, nextPrice);
+    } else {
+      setLiveCurrentBid(startPrice);
+    }
   };
 
   // ── Revoke Bid Handler ───────────────────────────────────────────────────
   const handleRevokeBid = () => {
     if (!activePlayer || isSoldOut || !activePlayer.leadingTeam) return;
-    if (!window.confirm(`Revoke current high bid on "${activePlayer.name}" and reset to Base Price ₹${activePlayer.basePrice} PTS?`)) return;
+    const baseVal = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+    if (!window.confirm(`Revoke current high bid on "${activePlayer.name}" and reset to Base Price ₹${baseVal.toLocaleString()} PTS?`)) return;
     
     const updated = {
       ...activePlayer,
-      currentBid: activePlayer.basePrice,
+      currentBid: baseVal,
       leadingTeam: null
     };
     setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+    setLiveCurrentBid(baseVal);
+    setLiveHighBidder(null);
   };
 
   return (
@@ -427,6 +596,28 @@ export default function ProjectorView({
       {/* Background Neon Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-gradient-to-tr from-cyan-500/10 via-purple-600/10 to-rose-600/10 rounded-full blur-[140px] pointer-events-none"></div>
 
+      {/* ⚡ High-Impact Live Bid Pop-in Broadcast Alert */}
+      {latestBidAlert && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 backdrop-blur-2xl px-6 py-3.5 rounded-2xl border-2 border-cyan-400 shadow-[0_0_50px_rgba(0,242,254,0.65)] flex items-center gap-3.5 animate-fade-in">
+          <span className="relative flex h-3.5 w-3.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-cyan-500"></span>
+          </span>
+          <span className="text-[11px] font-black uppercase tracking-widest text-cyan-300 font-mono">
+            {latestBidAlert.type === 'SOLD' ? '🔨 SOLD OUT' : '⚡ LIVE BID APPLIED'}
+          </span>
+          <span className="text-white font-black text-base sm:text-xl">
+            {latestBidAlert.teamName}
+          </span>
+          <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-400 drop-shadow-[0_0_15px_#00ff87]">
+            ₹{latestBidAlert.amount} PTS
+          </span>
+          <span className="text-xs text-slate-300 font-sans hidden sm:inline">
+            for <strong className="text-amber-300">{latestBidAlert.playerName}</strong>
+          </span>
+        </div>
+      )}
+
       {/* ── Top TV Header Controls ── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 z-10 border-b border-cyan-500/20 pb-4 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto">
         
@@ -434,15 +625,16 @@ export default function ProjectorView({
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white p-1 border border-cyan-500/40 shadow-[0_0_20px_rgba(0,242,254,0.4)] shrink-0 flex items-center justify-center">
             <img
-              src="/nyati_era_logo.png"
-              alt="Nyati Era"
+              src={tournamentSettings?.logoUrl || '/nyati_era_logo.png'}
+              alt={tournamentSettings?.tournamentName || 'Tournament Logo'}
               className="w-full h-full object-contain"
+              onError={(e) => { e.target.src = '/nyati_era_logo.png'; }}
             />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight gradient-text-brand font-sans">
-                Nyati Era Premier League {new Date().getFullYear()}
+                {tournamentSettings?.tournamentName || 'Nyati Era'} {tournamentSettings?.subtitle || 'Premier League'} {tournamentSettings?.edition || new Date().getFullYear()}
               </h1>
               <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-serif font-bold shadow-[0_0_12px_rgba(121,40,202,0.3)]">
                 कर्मण्येवाधिकारस्ते
@@ -505,6 +697,48 @@ export default function ProjectorView({
 
       </div>
 
+      {/* ── Real-Time Live Bid Stream Broadcast Strip ── */}
+      <div className="z-10 w-full max-w-[1800px] 3xl:max-w-[2100px] mx-auto mt-2 mb-1 bg-slate-950/85 backdrop-blur-xl border border-cyan-500/30 rounded-2xl py-2 px-4 flex items-center justify-between gap-4 shadow-[0_4px_25px_rgba(0,242,254,0.15)] overflow-hidden">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+          </span>
+          <span className="text-xs font-black font-mono tracking-widest uppercase text-rose-400 flex items-center gap-1.5">
+            <span>LIVE BID STREAM</span>
+          </span>
+        </div>
+
+        {/* Stream Content Ticker */}
+        <div className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-3">
+          {liveBidFeed.length > 0 ? (
+            liveBidFeed.slice(0, 8).map((item, idx) => (
+              <div 
+                key={item.id || idx}
+                className={`flex items-center gap-2 px-3 py-1 rounded-xl text-xs font-mono shrink-0 transition-all border ${
+                  idx === 0 
+                    ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-[0_0_15px_rgba(0,242,254,0.3)] font-bold scale-[1.02]' 
+                    : 'bg-slate-900/80 text-slate-300 border-slate-800'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.teamColor || '#00f2fe' }} />
+                <span className="font-extrabold text-white truncate max-w-[130px]">{item.teamName}</span>
+                <span className="font-black text-emerald-400">₹{item.amount} PTS</span>
+                {item.playerName && (
+                  <span className="text-slate-400 text-[10px] hidden sm:inline">for {item.playerName}</span>
+                )}
+                <span className="text-[10px] text-slate-500">({item.timestamp})</span>
+              </div>
+            ))
+          ) : (
+            <span className="text-xs font-mono text-slate-500 flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-slate-600 animate-pulse" />
+              <span>Waiting for live franchise bids to stream across devices…</span>
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* ── Main Theater Bidding Display ── */}
       {activePlayer ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12 items-center z-10 max-w-[1800px] 3xl:max-w-[2100px] mx-auto w-full my-auto py-2">
@@ -516,7 +750,7 @@ export default function ProjectorView({
             <div className="relative w-full max-w-[340px] sm:max-w-[400px] xl:max-w-[460px] 2xl:max-w-[500px] 3xl:max-w-[540px] flex items-center justify-center">
               
               {/* ⬅️ Previous Player Arrow (Around Picture Left) */}
-              {availablePool.length > 1 && (
+              {activeNavPool.length > 1 && (
                 <button
                   onClick={handlePrevAvailablePlayer}
                   className="absolute -left-4 sm:-left-6 top-1/3 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
@@ -530,16 +764,20 @@ export default function ProjectorView({
               <div className={`w-full rounded-3xl overflow-hidden border-4 transition-all duration-500 bg-slate-900 shadow-2xl relative ${
                 isSoldOut 
                   ? 'border-rose-500/80 shadow-[0_0_60px_rgba(244,63,94,0.45)]' 
-                  : 'border-cyan-500/50 shadow-[0_0_50px_rgba(0,242,254,0.35)]'
+                  : isUnsold
+                    ? 'border-amber-500/80 shadow-[0_0_60px_rgba(245,158,11,0.35)]'
+                    : 'border-cyan-500/50 shadow-[0_0_50px_rgba(0,242,254,0.35)]'
               }`}>
                 
-                {/* Photo Area */}
-                <div className="h-72 sm:h-80 xl:h-[380px] 2xl:h-[420px] 3xl:h-[460px] w-full relative overflow-hidden bg-slate-950">
+                {/* Photo Area with Direct On-Image Pagination Controls */}
+                <div className="h-72 sm:h-80 xl:h-[380px] 2xl:h-[420px] 3xl:h-[460px] w-full relative overflow-hidden bg-slate-950 select-none group/photo">
                   <img
                     key={activePlayer.id}
                     src={activePlayer.avatarUrl}
                     alt={activePlayer.name}
-                    className={`w-full h-full object-cover object-[center_15%] scale-105 transition-all duration-500 animate-fade-in ${isSoldOut ? 'grayscale-[30%] brightness-75' : ''}`}
+                    className={`w-full h-full object-cover object-[center_15%] scale-105 transition-all duration-500 animate-fade-in ${
+                      isSoldOut ? 'grayscale-[30%] brightness-75' : isUnsold ? 'grayscale-[20%] brightness-85' : ''
+                    }`}
                     onError={(e) => {
                       e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
                     }}
@@ -547,7 +785,7 @@ export default function ProjectorView({
 
                   {/* 🔴 PROMINENT SOLD OUT STAMP OVERLAY */}
                   {isSoldOut && (
-                    <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-[2px] flex flex-col items-center justify-center p-3">
+                    <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 pointer-events-none z-20">
                       <div className="transform -rotate-12 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white font-black text-2xl sm:text-3xl uppercase tracking-widest px-6 py-2 rounded-2xl shadow-[0_0_25px_rgba(244,63,94,0.8)] border-2 border-white/40 animate-pulse flex items-center gap-2">
                         <Tag className="w-5 h-5" />
                         <span>SOLD OUT</span>
@@ -568,10 +806,73 @@ export default function ProjectorView({
                     </div>
                   )}
 
-                  {/* Category Pill Badge */}
-                  <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-cyan-500/50 text-cyan-300 font-black text-xs uppercase tracking-wider shadow-lg">
+                  {/* 🟡 PROMINENT UNSOLD / PASSED STAMP OVERLAY */}
+                  {isUnsold && !isSoldOut && (
+                    <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 pointer-events-none z-20">
+                      <div className="transform -rotate-12 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white font-black text-2xl sm:text-3xl uppercase tracking-widest px-6 py-2.5 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.8)] border-2 border-white/40 animate-pulse flex items-center gap-2">
+                        <XCircle className="w-6 h-6 text-white" />
+                        <span>UNSOLD / PASSED</span>
+                      </div>
+                      <span className="mt-3 text-xs font-mono font-bold text-amber-200 bg-slate-950/90 px-3.5 py-1 rounded-full border border-amber-500/50 shadow-md">
+                        Available in subsequent rounds
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Category Pill Badge (Top Left) */}
+                  <div className="absolute top-3 left-3 z-30 bg-slate-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-cyan-500/50 text-cyan-300 font-black text-xs uppercase tracking-wider shadow-lg">
                     {activePlayer.category}
                   </div>
+
+                  {/* Counter & Pool Toggle Badge (Top Right) */}
+                  <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-cyan-500/40 text-[10px] font-mono font-bold text-cyan-300 shadow-md">
+                    <span>{currentNavIdx >= 0 ? currentNavIdx + 1 : 1}</span>
+                    <span className="text-slate-600">/</span>
+                    <span>{activeNavPool.length}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNavPoolMode(prev => prev === 'available' ? 'all' : 'available');
+                      }}
+                      className="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 uppercase tracking-wider transition cursor-pointer border border-cyan-500/30"
+                      title={`Toggle pool filter (Current: ${navPoolMode === 'available' ? 'Available Only' : 'All Players'})`}
+                    >
+                      {navPoolMode === 'available' ? 'Avail' : 'All'}
+                    </button>
+                  </div>
+
+                  {/* 🔘 Bottom Pagination Pill Bar on Image */}
+                  {activeNavPool.length > 1 && (
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/90 backdrop-blur-md border border-cyan-500/40 shadow-[0_4px_25px_rgba(0,0,0,0.9)] max-w-[92%]">
+                      <button
+                        type="button"
+                        onClick={handlePrevNav}
+                        className="p-1 rounded-full text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/20 transition cursor-pointer"
+                        title="Previous Player"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-slate-300 whitespace-nowrap">
+                        <span className="text-cyan-400 font-extrabold">{currentNavIdx >= 0 ? currentNavIdx + 1 : 1}</span>
+                        <span className="text-slate-600">/</span>
+                        <span>{activeNavPool.length}</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold tracking-wider hidden sm:inline ml-1">
+                          {navPoolMode === 'available' ? 'Available' : 'Players'}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleNextNav}
+                        className="p-1 rounded-full text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/20 transition cursor-pointer"
+                        title="Next Player"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* ⚡ Combined Performance Score Bottom Bar */}
@@ -649,7 +950,7 @@ export default function ProjectorView({
               </div>
 
               {/* ➡️ Next Player Arrow (Around Picture Right) */}
-              {availablePool.length > 1 && (
+              {activeNavPool.length > 1 && (
                 <button
                   onClick={handleNextAvailablePlayer}
                   className="absolute -right-4 sm:-right-6 top-1/3 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
@@ -746,21 +1047,25 @@ export default function ProjectorView({
             <div className={`p-4 sm:p-5 rounded-2xl backdrop-blur-xl border shadow-xl flex items-center justify-between transition-all duration-300 ${
               isSoldOut 
                 ? 'bg-rose-950/40 border-rose-500/40 shadow-rose-950/50' 
-                : 'bg-slate-900/90 border-cyan-500/30 shadow-cyan-950/50'
+                : isUnsold
+                  ? 'bg-amber-950/30 border-amber-500/40 shadow-amber-950/40'
+                  : 'bg-slate-900/90 border-cyan-500/30 shadow-cyan-950/50'
             }`}>
               <div>
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Base Price</span>
-                <span className="text-xl sm:text-2xl font-bold text-slate-200 font-mono">₹{activePlayer.basePrice} PTS</span>
+                <span className="text-xl sm:text-2xl font-bold text-slate-200 font-mono">₹{effectiveBasePrice.toLocaleString()} PTS</span>
               </div>
 
               <div className="text-right">
-                <span className={`text-[11px] font-extrabold uppercase tracking-widest block ${isSoldOut ? 'text-rose-400' : 'text-cyan-400'}`}>
-                  {isSoldOut ? 'FINAL SOLD PRICE' : 'CURRENT HIGH BID'}
+                <span className={`text-[11px] font-extrabold uppercase tracking-widest block ${
+                  isSoldOut ? 'text-rose-400' : isUnsold ? 'text-amber-400' : 'text-cyan-400'
+                }`}>
+                  {isSoldOut ? 'FINAL SOLD PRICE' : isUnsold ? 'STATUS: UNSOLD' : (leadingTeamObj ? 'CURRENT HIGH BID' : 'CURRENT BID')}
                 </span>
                 <span className={`text-3xl sm:text-5xl font-black font-mono drop-shadow-md ${
-                  isSoldOut ? 'text-emerald-400' : 'text-cyan-300 drop-shadow-[0_0_20px_rgba(0,242,254,0.4)]'
+                  isSoldOut ? 'text-emerald-400' : isUnsold ? 'text-amber-300' : 'text-cyan-300 drop-shadow-[0_0_20px_rgba(0,242,254,0.4)]'
                 }`}>
-                  ₹{currentBid} PTS
+                  ₹{currentBid.toLocaleString()} PTS
                 </span>
               </div>
             </div>
@@ -768,10 +1073,10 @@ export default function ProjectorView({
             {/* Leading Team Display */}
             {leadingTeamObj ? (
               <div 
-                className="p-3 rounded-2xl border transition-all duration-300 flex items-center justify-between"
+                className="p-3.5 rounded-2xl border transition-all duration-300 flex items-center justify-between shadow-md"
                 style={{
-                  backgroundColor: `${leadingTeamObj.color || '#00f2fe'}15`,
-                  borderColor: `${leadingTeamObj.color || '#00f2fe'}50`,
+                  backgroundColor: `${leadingTeamObj.color || '#00f2fe'}18`,
+                  borderColor: `${leadingTeamObj.color || '#00f2fe'}60`,
                 }}
               >
                 {(() => {
@@ -790,11 +1095,22 @@ export default function ProjectorView({
                   );
                 })()}
 
-                {isSoldOut && (
-                  <span className="px-3 py-1 rounded-xl bg-rose-500/30 text-rose-200 font-bold text-xs uppercase tracking-wider border border-rose-400/40 shrink-0">
-                    SQUAD CONFIRMED
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  <div className="text-right font-mono">
+                    <span className="text-[9px] uppercase font-bold text-cyan-300 tracking-wider block">
+                      {isSoldOut ? 'Sold For' : 'Current High Bid'}
+                    </span>
+                    <span className="text-base sm:text-xl font-black text-cyan-200">
+                      ₹{currentBid.toLocaleString()} PTS
+                    </span>
+                  </div>
+
+                  {isSoldOut && (
+                    <span className="px-3 py-1 rounded-xl bg-rose-500/30 text-rose-200 font-bold text-xs uppercase tracking-wider border border-rose-400/40 shrink-0">
+                      SQUAD CONFIRMED
+                    </span>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="p-3 text-center rounded-xl bg-slate-900/60 border border-dashed border-slate-800 text-slate-500 text-xs font-mono">
@@ -802,17 +1118,66 @@ export default function ProjectorView({
               </div>
             )}
 
+            {/* ── Live Bid Stream Activity Box (Who & How Much Bid Applied) ── */}
+            <div className="bg-slate-900/90 rounded-2xl border border-cyan-500/25 p-3 space-y-2 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                  <span>Real-Time Live Bid Stream</span>
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {liveBidFeed.filter(b => b.playerId === activePlayer?.id).length} Bids on Player
+                </span>
+              </div>
+
+              {/* Feed List */}
+              <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1 font-mono text-xs">
+                {liveBidFeed.filter(b => b.playerId === activePlayer?.id).length > 0 ? (
+                  liveBidFeed.filter(b => b.playerId === activePlayer?.id).slice(0, 4).map((bid, bIdx) => (
+                    <div 
+                      key={bid.id || bIdx} 
+                      className={`flex items-center justify-between p-2 rounded-xl border transition ${
+                        bIdx === 0 
+                          ? 'bg-cyan-500/15 border-cyan-400/50 shadow-sm text-white font-bold' 
+                          : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: bid.teamColor || '#00f2fe' }} />
+                        <span className="text-sand-100 font-extrabold truncate max-w-[150px]">
+                          {bid.teamName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 uppercase">applied bid</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-black text-emerald-400">
+                          ₹{bid.amount} PTS
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {bid.timestamp}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-2 text-slate-500 text-xs italic">
+                    Waiting for franchise auctioneers to apply bids on <strong className="text-slate-300 not-italic">{activePlayer?.name}</strong>…
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Dynamic Bidding Tier Indicator */}
             {!isSoldOut && (
               <div className="px-3.5 py-2 rounded-xl bg-slate-900/80 border border-cyan-500/30 flex items-center justify-between text-xs font-mono shadow-sm">
                 <div className="flex items-center space-x-2 text-cyan-300">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00f2fe]" />
                   <span className="font-bold uppercase tracking-wider text-[10px]">
-                    {getBidSlabInfo(currentBid).label} ({getBidSlabInfo(currentBid).rangeText})
+                    {getBidSlabInfo(currentBid, tournamentSettings?.bidIncrementStep, activePlayer?.basePrice).label} ({getBidSlabInfo(currentBid, tournamentSettings?.bidIncrementStep, activePlayer?.basePrice).rangeText})
                   </span>
                 </div>
                 <span className="text-emerald-400 font-extrabold text-xs">
-                  Min Step: +₹{getBidIncrement(currentBid)} PTS
+                  Min Step: +₹{getBidIncrement(currentBid, tournamentSettings?.bidIncrementStep, activePlayer?.basePrice).toLocaleString()} PTS
                 </span>
               </div>
             )}
@@ -820,26 +1185,31 @@ export default function ProjectorView({
             {/* Team Bidding Control Suite */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
               {teams.map((t) => {
-                const isCurrentLeading = activePlayer?.leadingTeam === t.id;
+                const isCurrentLeading = activePlayer?.leadingTeam === t.id || (liveHighBidder?.id === t.id);
                 const isDisabled = isSoldOut || !canBid || isCurrentLeading;
-                const currentInc = getBidIncrement(currentBid);
+                const effectiveBase = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+                const hasBids = Boolean(liveHighBidder || (activePlayer?.leadingTeam && (activePlayer?.currentBid > effectiveBase || (liveCurrentBid && liveCurrentBid > effectiveBase))));
+                const currentInc = getBidIncrement(currentBid, tournamentSettings?.bidIncrementStep, effectiveBase);
+                const nextBidAmount = hasBids ? (currentBid + currentInc) : effectiveBase;
+                const remainingPurse = t.totalPurse - t.spentPurse;
+                const canAfford = remainingPurse >= nextBidAmount;
 
                 return (
                   <button
                     key={t.id}
-                    disabled={isDisabled}
+                    disabled={isDisabled || (!isCurrentLeading && !canAfford)}
                     onClick={() => handleQuickBid(t, currentInc)}
                     className={`p-2.5 pl-3 rounded-xl text-left transition border relative overflow-hidden ${
-                      isDisabled
-                        ? 'bg-slate-950/50 border-slate-800 opacity-40 cursor-not-allowed'
-                        : isCurrentLeading
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/50 scale-[1.01]'
+                      isCurrentLeading
+                        ? 'bg-cyan-500/25 border-cyan-400 text-cyan-100 ring-2 ring-cyan-400/60 scale-[1.02] shadow-[0_0_25px_rgba(0,242,254,0.35)]'
+                        : isDisabled || !canAfford
+                          ? 'bg-slate-950/50 border-slate-800 opacity-40 cursor-not-allowed'
                           : 'bg-slate-900/90 hover:bg-slate-800 border-slate-800 text-white active:scale-95 cursor-pointer'
                     }`}
                     style={{
                       boxShadow: isCurrentLeading
                         ? `0 0 25px ${t.color || '#00f2fe'}40, 0 4px 15px ${t.color || '#00f2fe'}25`
-                        : !isDisabled
+                        : !isDisabled && canAfford
                           ? `0 6px 20px -4px ${t.color || '#00f2fe'}20`
                           : undefined
                     }}
@@ -855,14 +1225,25 @@ export default function ProjectorView({
                     
                     <div className="flex items-center justify-between">
                       <span className="font-extrabold text-white text-xs block truncate font-sans">{t.shortName || t.name}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                        {isSoldOut ? 'SOLD' : `+${currentInc}`}
+                      <span className={`text-[10px] font-mono font-bold ${isCurrentLeading ? 'text-cyan-300 font-black' : 'text-emerald-400'}`}>
+                        {isSoldOut 
+                          ? 'SOLD' 
+                          : isCurrentLeading 
+                            ? '👑 HIGH BID' 
+                            : hasBids
+                              ? `+₹${currentInc.toLocaleString()}`
+                              : 'Base Price'}
                       </span>
                     </div>
-                    
-                    <span className="text-[10px] text-slate-400 block truncate font-mono mt-0.5">
-                      Purse: ₹{t.totalPurse - t.spentPurse}
-                    </span>
+
+                    <div className="flex items-center justify-between mt-1 text-[10px] font-mono">
+                      <span className={isCurrentLeading ? 'text-cyan-300 font-extrabold' : 'text-amber-300 font-bold'}>
+                        {isCurrentLeading ? `₹${currentBid.toLocaleString()} PTS` : hasBids ? `Bid ₹${nextBidAmount.toLocaleString()}` : `Opening ₹${nextBidAmount.toLocaleString()}`}
+                      </span>
+                      <span className="text-slate-400 truncate">
+                        Purse: ₹{remainingPurse.toLocaleString()}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
@@ -879,7 +1260,7 @@ export default function ProjectorView({
                   <button
                     onClick={() => {
                       if (!window.confirm(`Reopen auction for "${activePlayer.name}" and return to available pool?`)) return;
-                      const updated = { ...activePlayer, status: 'available', soldPrice: null, soldTo: null, leadingTeam: null, currentBid: activePlayer.basePrice };
+                      const updated = { ...activePlayer, status: 'available', soldPrice: null, soldTo: null, leadingTeam: null, currentBid: getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice) };
                       setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
                       apiUpdatePlayer(activePlayer.id, updated).catch(console.warn);
                       if (buyerTeamObj) {
@@ -900,11 +1281,15 @@ export default function ProjectorView({
                 <button
                   onClick={handleMarkUnsold}
                   disabled={isProcessing}
-                  className="flex items-center justify-center space-x-2 px-5 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-bold text-sm border border-slate-700 transition cursor-pointer shrink-0 shadow-md"
-                  title="Pass player / Mark as Unsold"
+                  className={`flex items-center justify-center space-x-2 px-5 py-4 rounded-2xl font-bold text-sm border transition cursor-pointer shrink-0 shadow-md ${
+                    isUnsold 
+                      ? 'bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border-amber-500/50 hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]' 
+                      : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                  }`}
+                  title={isUnsold ? 'Player is already unsold — Advance to next player (→)' : 'Pass player / Mark as Unsold'}
                 >
-                  <XCircle className="w-5 h-5 text-slate-400" />
-                  <span className="hidden sm:inline">Pass / Unsold</span>
+                  <XCircle className={`w-5 h-5 ${isUnsold ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <span className="hidden sm:inline">{isUnsold ? 'Marked Unsold (Next →)' : 'Pass / Unsold'}</span>
                 </button>
 
                 {leadingTeamObj && (
@@ -984,7 +1369,7 @@ export default function ProjectorView({
           </div>
 
           <div className="text-slate-500 text-[11px] hidden md:block">
-            Nyati Era Box Cricket League {new Date().getFullYear()}
+            {tournamentSettings?.tournamentName || 'Nyati Era'} {tournamentSettings?.subtitle || 'Box Cricket League'} {tournamentSettings?.edition || new Date().getFullYear()}
           </div>
         </div>
       </div>

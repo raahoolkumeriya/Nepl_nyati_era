@@ -48,7 +48,7 @@ router.put('/:id', async (req, res) => {
     const match = await Match.findOneAndUpdate(
       { id: req.params.id },
       { $set: req.body },
-      { new: true, upsert: true, lean: true }
+      { returnDocument: 'after', upsert: true, lean: true }
     );
     const { _id, __v, ...m } = match;
     res.json(m);

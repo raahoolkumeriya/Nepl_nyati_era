@@ -1,5 +1,6 @@
 # Environment secret files
-*/scripts/*
+*/scripts/*py
+./scripts/scrap_cricheroes_Jain.py
 .env
 .env.local
 .env.*.local

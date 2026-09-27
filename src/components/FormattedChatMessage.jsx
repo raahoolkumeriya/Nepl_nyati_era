@@ -311,7 +311,7 @@ export default function FormattedChatMessage({ content, isUser = false }) {
           // Header row is row 0
           const headerCells = rawRows[0].slice(1, -1);
           // Check if row 1 is separator (contains dashes)
-          const hasSeparator = rawRows.length > 1 && rawRows[1].some(c => /^[-:\s]+$/.test(c));
+          const hasSeparator = rawRows.length > 1 && rawRows[1].some(c => /^[\s:-]+$/.test(c));
           const dataRows = hasSeparator ? rawRows.slice(2) : rawRows.slice(1);
 
           return (

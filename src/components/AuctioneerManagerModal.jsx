@@ -88,7 +88,7 @@ export default function AuctioneerManagerModal({ isOpen, onClose, players = [], 
   
   const [activeTab, setActiveTab] = useState('promote_player'); // 'promote_player' | 'custom_user'
   
-  const defaultAuctioneerPass = (import.meta.env.VITE_AUCTIONEER_PASS || '').trim() || 'Auction@2026';
+  const defaultAuctioneerPass = (import.meta.env.VITE_AUCTIONEER_PASS || '').trim();
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [playerEmail, setPlayerEmail] = useState('');
   const [playerPassword, setPlayerPassword] = useState(defaultAuctioneerPass);

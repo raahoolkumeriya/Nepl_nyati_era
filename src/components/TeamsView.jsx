@@ -30,12 +30,15 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useTournament } from '../context/TournamentContext';
 import { updateTeam as apiUpdateTeam, deleteTeam as apiDeleteTeam, updatePlayer as apiUpdatePlayer, isMongoDB } from '../services/api';
 import { TEAM_COLOR_THEMES, getThemeByColor, getThemeByIndex } from '../data/teamThemes';
 import { compressImage } from '../utils/imageCompressor';
 
 export default function TeamsView({ teams, setTeams, players = [], setPlayers, onOpenAiChat }) {
   const { can, usersList } = useAuth();
+  const { tournamentSettings } = useTournament();
+  const startupPurse = Number(tournamentSettings?.startupPurse) || 10000;
   const canManage = can('canManageTeams');
 
   const [showModal, setShowModal] = useState(false);
@@ -121,7 +124,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
     owner: '',
     captainPlayerId: '',
     logo: '🏏',
-    totalPurse: 10000,
+    totalPurse: startupPurse,
     maxSquadSize: 10,
     color: '#d4622a',
     teamPhotoUrl: '',
@@ -167,7 +170,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       owner: '',
       captainPlayerId: '',
       logo: availableTheme.logo,
-      totalPurse: 10000,
+      totalPurse: startupPurse,
       maxSquadSize: 10,
       color: availableTheme.color,
       teamPhotoUrl: '',
@@ -197,7 +200,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       owner: team.owner || team.captainName || '',
       captainPlayerId: existingCaptain?.id || team.captainId || '',
       logo: team.logo || '🏏',
-      totalPurse: team.totalPurse || 10000,
+      totalPurse: team.totalPurse || startupPurse,
       maxSquadSize: team.maxSquadSize || 10,
       color: team.color || '#d4622a',
       teamPhotoUrl: team.teamPhotoUrl || '',
@@ -210,45 +213,59 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
     const teamId = targetTeam.id;
     let updatedSquad = [...(targetTeam.squad || [])];
     
-    // 1. If there was a previous captain, remove them from squad and free them
+    // 1. Identify previous captain
     const oldCaptainId = prevCaptainPlayerId || targetTeam.captainId || updatedSquad.find(p => p.isCaptain)?.id;
-    if (oldCaptainId && oldCaptainId !== newCaptainPlayerId) {
-      updatedSquad = updatedSquad.filter(p => p.id !== oldCaptainId);
+
+    // 2. If there was an old captain who is not the new captain, demote them
+    if (oldCaptainId && String(oldCaptainId) !== String(newCaptainPlayerId)) {
+      // Demote old captain inside the squad (keep them in squad, but remove captaincy)
+      updatedSquad = updatedSquad.map(p => {
+        if (String(p.id) === String(oldCaptainId)) {
+          return {
+            ...p,
+            isCaptain: false,
+            isAuctioneer: false,
+            captainOfTeamId: null,
+          };
+        }
+        return p;
+      });
+
+      // Also demote in global players pool
       if (setPlayers) {
         setPlayers(prev => prev.map(p => {
-          if (p.id === oldCaptainId && p.soldTo === teamId) {
-            const freed = {
+          if (String(p.id) === String(oldCaptainId) && p.soldTo === teamId) {
+            const demoted = {
               ...p,
-              status: 'available',
-              soldPrice: 0,
-              soldTo: null,
               isCaptain: false,
               isAuctioneer: false,
               captainOfTeamId: null,
             };
-            apiUpdatePlayer(p.id, freed).catch(err => console.warn('Free captain sync error:', err));
-            return freed;
+            apiUpdatePlayer(p.id, demoted).catch(err => console.warn('Demote captain sync error:', err));
+            return demoted;
           }
           return p;
         }));
       }
     }
 
-    // 2. If a new captain is selected, add them into the squad
+    // 3. If a new captain is selected, promote them and ensure ONLY they have isCaptain
     let assignedCaptainName = targetTeam.owner || '';
     if (newCaptainPlayerId) {
-      const playerObj = players.find(p => p.id === newCaptainPlayerId);
+      const playerObj = players.find(p => String(p.id) === String(newCaptainPlayerId)) ||
+        updatedSquad.find(p => String(p.id) === String(newCaptainPlayerId));
+
       if (playerObj) {
         assignedCaptainName = playerObj.name;
         
-        // Remove player from existing team if they were on another team
+        // Remove player from existing other teams if they were on another team
         teams.forEach(otherTeam => {
-          if (otherTeam.id !== teamId && otherTeam.squad?.some(s => s.id === newCaptainPlayerId)) {
-            const cleanedSquad = otherTeam.squad.filter(s => s.id !== newCaptainPlayerId);
+          if (otherTeam.id !== teamId && otherTeam.squad?.some(s => String(s.id) === String(newCaptainPlayerId))) {
+            const cleanedSquad = otherTeam.squad.filter(s => String(s.id) !== String(newCaptainPlayerId));
             const cleanedTeam = {
               ...otherTeam,
-              captainId: otherTeam.captainId === newCaptainPlayerId ? null : otherTeam.captainId,
-              captainName: otherTeam.captainId === newCaptainPlayerId ? null : otherTeam.captainName,
+              captainId: String(otherTeam.captainId) === String(newCaptainPlayerId) ? null : otherTeam.captainId,
+              captainName: String(otherTeam.captainId) === String(newCaptainPlayerId) ? null : otherTeam.captainName,
               playersCount: cleanedSquad.length,
               squad: cleanedSquad
             };
@@ -257,8 +274,8 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
           }
         });
 
-        // Add captain into target squad if not already present
-        const existingIdx = updatedSquad.findIndex(s => s.id === newCaptainPlayerId);
+        // Add or update captain in target squad
+        const existingIdx = updatedSquad.findIndex(s => String(s.id) === String(newCaptainPlayerId));
         const captainSquadMember = {
           id: playerObj.id,
           name: playerObj.name,
@@ -272,15 +289,29 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         };
 
         if (existingIdx >= 0) {
+          // Replace in place
           updatedSquad[existingIdx] = captainSquadMember;
         } else {
+          // Add to beginning of squad
           updatedSquad.unshift(captainSquadMember);
         }
+
+        // Strictly guarantee NO OTHER player in this squad is marked as captain
+        updatedSquad = updatedSquad.map(member => {
+          if (String(member.id) === String(newCaptainPlayerId)) {
+            return { ...member, isCaptain: true, captainOfTeamId: teamId };
+          }
+          return {
+            ...member,
+            isCaptain: false,
+            captainOfTeamId: member.captainOfTeamId === teamId ? null : member.captainOfTeamId,
+          };
+        });
 
         // Update player record in players state & DB
         if (setPlayers) {
           setPlayers(prev => prev.map(p => {
-            if (p.id === newCaptainPlayerId) {
+            if (String(p.id) === String(newCaptainPlayerId)) {
               const updatedP = {
                 ...p,
                 status: 'sold',
@@ -292,16 +323,33 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
               };
               apiUpdatePlayer(p.id, updatedP).catch(err => console.warn('Captain player sync error:', err));
               return updatedP;
+            } else if (p.captainOfTeamId === teamId || (p.isCaptain && p.soldTo === teamId)) {
+              // Ensure any previous captain in global pool is cleared
+              const clearedP = {
+                ...p,
+                isCaptain: false,
+                isAuctioneer: false,
+                captainOfTeamId: null,
+              };
+              apiUpdatePlayer(p.id, clearedP).catch(err => console.warn('Clear old captain sync error:', err));
+              return clearedP;
             }
             return p;
           }));
         }
       }
+    } else {
+      // If captain was removed / unassigned, clear isCaptain for all in squad
+      updatedSquad = updatedSquad.map(m => ({
+        ...m,
+        isCaptain: false,
+        captainOfTeamId: null,
+      }));
     }
 
     return {
       ...targetTeam,
-      captainId: newCaptainPlayerId || null,
+      captainId: newCaptainPlayerId ? String(newCaptainPlayerId) : null,
       captainName: newCaptainPlayerId ? assignedCaptainName : null,
       owner: assignedCaptainName || targetTeam.owner || 'Auctioneer Captain',
       playersCount: updatedSquad.length,
@@ -849,9 +897,9 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
           const maxCapacity = team.maxSquadSize || 10;
           const isFull = squad.length >= maxCapacity;
           
-          const captainInSquad = squad.find(p => p.isCaptain) || 
-            players.find(p => p.captainOfTeamId === team.id || (p.isCaptain && p.soldTo === team.id)) ||
-            (team.captainId ? squad.find(p => p.id === team.captainId) : null);
+          // Strictly determine the ONE official team captain ID
+          const officialCaptainId = team.captainId || (squad.find(p => p.isCaptain)?.id) || null;
+          const captainInSquad = officialCaptainId ? squad.find(p => String(p.id) === String(officialCaptainId)) : null;
           
           const battersCount = squad.filter(p => (p.role || '').includes('Batsman') || (p.role || '').includes('Pure')).length;
           const bowlersCount = squad.filter(p => (p.role || '').includes('Bowler') || (p.role || '').includes('Spin') || (p.role || '').includes('Fast')).length;
@@ -1146,13 +1194,13 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                   {squad.length > 0 ? (
                     <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
                       {[...squad].sort((a, b) => {
-                        const aIsCap = Boolean(a.isCaptain || (team.captainId && String(a.id) === String(team.captainId)) || (captainInSquad && String(a.id) === String(captainInSquad.id)));
-                        const bIsCap = Boolean(b.isCaptain || (team.captainId && String(b.id) === String(team.captainId)) || (captainInSquad && String(b.id) === String(captainInSquad.id)));
+                        const aIsCap = Boolean(officialCaptainId && String(a.id) === String(officialCaptainId));
+                        const bIsCap = Boolean(officialCaptainId && String(b.id) === String(officialCaptainId));
                         if (aIsCap && !bIsCap) return -1;
                         if (!aIsCap && bIsCap) return 1;
                         return 0;
                       }).map(player => {
-                        const isCap = Boolean(player.isCaptain || (team.captainId && String(player.id) === String(team.captainId)) || (captainInSquad && String(player.id) === String(captainInSquad.id)));
+                        const isCap = Boolean(officialCaptainId && String(player.id) === String(officialCaptainId));
                         return (
                           <div
                             key={player.id}

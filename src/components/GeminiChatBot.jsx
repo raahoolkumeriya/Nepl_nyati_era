@@ -23,8 +23,8 @@ export default function GeminiChatBot({
     {
       id: 'init-1',
       role: 'assistant',
-      text: `👋 **Welcome to the NEPL (Nyati Era Premiere League) AI Tournament Strategist!**\n\nI am pre-loaded with all official **NEPL ${new Date().getFullYear()} Season Rules** and live player performance ratings.\n\nAsk me any tournament question, simulate match scenarios, or click **"Generate Balanced Teams"** below!`,
-      source: 'Gemini AI Assistant',
+      text: `👋 **Welcome to the AI Tournament Strategist!**\n\nI am pre-loaded with official tournament season rules and live player performance ratings.\n\nAsk me any tournament question, simulate match scenarios, or click **"Generate Balanced Teams"** below!`,
+      source: 'Pavillion AI Bot',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -318,7 +318,7 @@ export default function GeminiChatBot({
         >
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff87]" />
           <Bot className="w-5 h-5 text-slate-950" />
-          <span className="font-sans font-extrabold">NEPL AI Bot</span>
+          <span className="font-sans font-extrabold">Pavillion AI Bot</span>
           <span className="px-2 py-0.5 rounded-full bg-slate-950/20 text-xs font-sans font-extrabold text-slate-900 border border-slate-950/30">
             Gemini
           </span>
@@ -341,7 +341,7 @@ export default function GeminiChatBot({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <h3 className="text-xs sm:text-sm md:text-base font-extrabold text-white tracking-tight font-sans truncate">
-                NEPL AI Tournament Strategist
+                AI Tournament Strategist
               </h3>
               <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[9px] font-sans font-bold border border-cyan-500/30 flex-shrink-0">
                 Gemini

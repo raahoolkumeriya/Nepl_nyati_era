@@ -254,8 +254,8 @@ export async function queryGeminiChat({
   const currentYear = new Date().getFullYear();
 
   const systemContext = `
-You are the Official "NEPL AI Tournament Strategist & Rules Arbitrator" for the Nyati Era Premier League (NEPL) Box Cricket ${currentYear}.
-You are fully knowledgeable about all tournament formats, especially the official **NEPL (Nyati Era Premiere League) ${currentYear} Summer Season Format**.
+You are the Official "AI Tournament Strategist & Rules Arbitrator" for the box cricket tournament ${currentYear}.
+You are fully knowledgeable about all tournament formats, especially the official **Box Cricket Season Rules & Format**.
 
 === OFFICIAL NEPL ${currentYear} RULES KNOWLEDGE BASE ===
 ${NEFL_2026_RAW_RULES_TEXT}
@@ -415,14 +415,14 @@ The NEPL 2026 squad composition standardizes:
 * **7 Male Players** (Total 12 Squad Members)
 
 💡 *Tip: Click the **"Generate Balanced Teams"** button right below to automatically calculate composite performance ratings (runs, strike rate, wickets, economy) and balance the full player pool across teams!*`,
-      source: 'NEPL AI Strategist',
+      source: 'Pavillion AI Bot',
       isLiveAI: false
     };
   }
 
   // General catch-all
   return {
-    text: `### 🏏 NEPL (Nyati Era Premiere League) 2026 Assistant Response
+    text: `### 🏏 AI Tournament Strategist Assistant Response
 
 The **NEPL 2026 Summer Season Format** features a 12-overs match structure:
 * **5 Privilege Overs:** 1 Super Master + 1 Master + 3 Female (Circular Strike)

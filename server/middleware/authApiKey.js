@@ -5,7 +5,7 @@ export function verifyApiKey(req, res, next) {
     req.path.startsWith('/docs') || 
     req.path === '/openapi.json' || 
     req.path === '/health' ||
-    req.path.startsWith('/auth')
+    (req.path === '/auth/login' && req.method === 'POST')
   ) {
     return next();
   }

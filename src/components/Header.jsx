@@ -19,10 +19,13 @@ import {
   Bot,
   Sun,
   Moon,
+  Edit3,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../utils/theme';
+import { useTournament } from '../context/TournamentContext';
 import AuctioneerManagerModal from './AuctioneerManagerModal';
+import TournamentSettingsModal from './TournamentSettingsModal';
 
 export default function Header({ 
   activeTab, 
@@ -34,14 +37,18 @@ export default function Header({
   onResetData,
   players = [],
   setPlayers,
+  teams = [],
+  setTeams,
   onOpenAiChat,
   viewerCount = 1,
   liveSocketConnected = false,
 }) {
   const { user, logout, can, roleConfig } = useAuth();
   const { theme, toggleTheme, isDark } = useTheme();
+  const { tournamentSettings } = useTournament();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
+  const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false);
 
   // Filter tabs based on role permissions
   const allTabs = [
@@ -64,23 +71,42 @@ export default function Header({
             className="flex items-center space-x-3 cursor-pointer group shrink-0" 
             onClick={() => setActiveTab(tabs[0]?.id || 'auction')}
           >
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-white/95 dark:bg-white p-1 border-2 border-[#cc785c]/40 shadow-[0_4px_16px_rgba(204,120,92,0.35)] group-hover:scale-105 group-hover:shadow-[0_6px_22px_rgba(204,120,92,0.5)] transition-all duration-200 shrink-0 flex items-center justify-center">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-slate-900/90 p-1 border-2 border-cyan-400/40 shadow-[0_4px_16px_rgba(0,242,254,0.3)] group-hover:scale-105 group-hover:shadow-[0_6px_22px_rgba(0,242,254,0.5)] transition-all duration-200 shrink-0 flex items-center justify-center">
               <img
-                src="/nyati_era_logo.png"
-                alt="Nyati Era Official Logo"
-                className="w-full h-full object-contain"
+                src={(tournamentSettings?.logoUrl && tournamentSettings.logoUrl !== '/nyati_era_logo.png') ? tournamentSettings.logoUrl : '/cricklocked_logo.png'}
+                alt={tournamentSettings?.tournamentName || 'Criclocked'}
+                className="w-full h-full object-cover rounded-xl"
+                onError={(e) => { e.target.src = '/cricklocked_logo.png'; }}
               />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h1 className="text-lg sm:text-2xl font-black tracking-tight gradient-text-brand font-sans leading-tight">
-                  Nyati Era
+                  {(!tournamentSettings?.tournamentName || tournamentSettings?.tournamentName === 'Nyati Era') ? 'Criclocked' : tournamentSettings.tournamentName}
                 </h1>
+                {user?.role === 'suprememaster' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsTournamentModalOpen(true);
+                    }}
+                    className="p-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition shadow-sm"
+                    title="Change Tournament Name & Branding (Supreme Master)"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-0.5">
                 <span className="text-xs sm:text-sm text-stone-300 dark:text-stone-300 light:text-stone-800 font-extrabold uppercase tracking-wider">
-                  Box Cricket League
+                  {tournamentSettings?.subtitle || 'Box Cricket League'}
                 </span>
+                {tournamentSettings?.shortCode && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#cc785c]/20 text-[#cc785c] font-mono font-bold">
+                    {tournamentSettings.shortCode}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -110,29 +136,33 @@ export default function Header({
           {/* ── Right Controls ── */}
           <div className="flex items-center space-x-2 shrink-0">
             {/* API Docs */}
-            <a
-              href="/api/docs"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden md:flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-300 border border-stone-800 transition"
-              title="Interactive OpenAPI 3.0 Docs"
-            >
-              <FileCode2 className="w-3.5 h-3.5 text-[#cc785c]" />
-              <span className="font-semibold text-[11px]">API</span>
-              <ExternalLink className="w-2.5 h-2.5 text-stone-500" />
-            </a>
+            {can('canViewApiDocs') && (
+              <a
+                href="/api/docs"
+                target="_blank"
+                rel="noreferrer"
+                className="hidden md:flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-300 border border-stone-800 transition"
+                title="Interactive OpenAPI 3.0 Docs"
+              >
+                <FileCode2 className="w-3.5 h-3.5 text-[#cc785c]" />
+                <span className="font-semibold text-[11px]">API</span>
+                <ExternalLink className="w-2.5 h-2.5 text-stone-500" />
+              </a>
+            )}
 
             {/* CricHeroes */}
-            <a
-              href="https://cricheroes.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden xl:flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-amber-300 border border-amber-500/25 transition"
-            >
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span className="font-semibold text-[11px]">CricHeroes</span>
-              <ExternalLink className="w-2.5 h-2.5 text-stone-500" />
-            </a>
+            {can('canViewCricHeroes') && (
+              <a
+                href="https://cricheroes.com"
+                target="_blank"
+                rel="noreferrer"
+                className="hidden xl:flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-amber-300 border border-amber-500/25 transition"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span className="font-semibold text-[11px]">CricHeroes</span>
+                <ExternalLink className="w-2.5 h-2.5 text-stone-500" />
+              </a>
+            )}
 
             {/* Manage Auctioneers — Super Admin Only */}
             {can('canManageUsers') && (
@@ -149,21 +179,21 @@ export default function Header({
             {/* Dark / Modern White Theme Transformation Toggle */}
             <button
               onClick={toggleTheme}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer ${
                 isDark
                   ? 'bg-stone-900 hover:bg-stone-800 text-amber-300 border-stone-800'
                   : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200 shadow-sm'
               }`}
               title={isDark ? "Switch to Modern Clean White Mode" : "Switch to Anthropic Dark Mode"}
-              aria-label="Toggle Dark/White Color Theme"
+              aria-label={isDark ? "Switch to Modern Clean White Mode" : "Switch to Anthropic Dark Mode"}
             >
               {isDark ? (
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
               ) : (
-                <Moon className="w-3.5 h-3.5 text-[#cc785c]" />
+                <Moon className="w-3.5 h-3.5 text-slate-700" />
               )}
               <span className="hidden md:inline-block font-bold text-[10px] uppercase tracking-wider">
-                {isDark ? 'Dark' : 'White'}
+                {isDark ? 'White' : 'Dark'}
               </span>
             </button>
 
@@ -189,6 +219,19 @@ export default function Header({
               >
                 <Tv className="w-3.5 h-3.5" />
                 <span>TV</span>
+              </button>
+            )}
+
+            {/* Supreme Master Clean Setup & Wipe Bids */}
+            {user?.role === 'suprememaster' && (
+              <button
+                onClick={onResetData}
+                className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-[10px] sm:text-[11px] uppercase tracking-wider transition cursor-pointer shadow-sm hover:shadow-[0_0_15px_rgba(244,63,94,0.3)]"
+                title="Wipe Bidding History & Clean Fresh Setup (Supreme Master Only)"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Wipe Bids & Setup</span>
+                <span className="md:hidden">Wipe</span>
               </button>
             )}
 
@@ -229,6 +272,17 @@ export default function Header({
                       </div>
                     </div>
 
+                    {user?.role === 'suprememaster' && (
+                      <button
+                        onClick={() => { setIsTournamentModalOpen(true); setShowUserMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-amber-300 hover:bg-amber-950/40 hover:text-amber-200 transition mb-1 cursor-pointer font-bold border border-amber-500/20"
+                        title="Configure global tournament name and identity"
+                      >
+                        <Trophy className="w-4 h-4 text-amber-400" />
+                        <span>Tournament Name & Brand</span>
+                      </button>
+                    )}
+
                     {can('canManageUsers') && (
                       <button
                         onClick={() => { setIsManagerOpen(true); setShowUserMenu(false); }}
@@ -246,10 +300,10 @@ export default function Header({
                           setShowUserMenu(false);
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-400 font-bold hover:bg-rose-950/60 hover:text-rose-200 transition border border-rose-500/30 mb-1 cursor-pointer"
-                        title="Clear all live auction data, bids, and teams from MongoDB Atlas (Supreme Master Only)"
+                        title="Wipe bidding history, reset players, and start clean fresh auction setup (Supreme Master Only)"
                       >
                         <RotateCcw className="w-4 h-4 text-rose-400" />
-                        <span>Clear Database (Supreme Master)</span>
+                        <span>Wipe History & Clean Setup</span>
                       </button>
                     )}
 
@@ -274,6 +328,16 @@ export default function Header({
         onClose={() => setIsManagerOpen(false)}
         players={players}
         setPlayers={setPlayers}
+      />
+
+      {/* Tournament Settings Modal (Supreme Master Only) */}
+      <TournamentSettingsModal
+        isOpen={isTournamentModalOpen}
+        onClose={() => setIsTournamentModalOpen(false)}
+        players={players}
+        setPlayers={setPlayers}
+        teams={teams}
+        setTeams={setTeams}
       />
 
       {/* Click outside to close user menu */}

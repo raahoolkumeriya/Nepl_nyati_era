@@ -12,18 +12,18 @@ import {
   Shield,
   Activity,
   Award,
-  Play,
-  Pause,
   Lock,
   TrendingUp,
   X,
   Crown,
   Zap,
+  Edit3,
 } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 import { useAuth } from '../auth/AuthContext';
+import { useTournament } from '../context/TournamentContext';
 import { updatePlayer as apiUpdatePlayer, updateTeam as apiUpdateTeam, isMongoDB } from '../services/api';
-import { getBidIncrement, getBidSlabInfo } from '../utils/bidding';
+import { getBidIncrement, getBidSlabInfo, getPlayerStartingBid } from '../utils/bidding';
 import { 
   getSocket, 
   liveSelectPlayer, 
@@ -45,9 +45,31 @@ export default function AuctionRoom({
   liveSocketConnected = false,
 }) {
   const { user, can } = useAuth();
+  const { tournamentSettings } = useTournament();
   const isSuperAdmin = user?.role === 'superuser';
   const canBid = can('canBid');
-  const canSell = can('canSellPlayer');
+  const canSell = can('canSellPlayer') || can('canUnsellPlayer');
+
+  const handleEditActivePlayerBasePrice = async () => {
+    if (!activePlayer || activePlayer.status === 'sold' || highBidder) return;
+    const input = prompt(`Enter new Base Price (PTS) for "${activePlayer.name}":`, String(activePlayer.basePrice || 100));
+    if (input === null) return;
+    const newPrice = Math.max(1, Number(input) || 0);
+    if (!newPrice) {
+      alert('Invalid price entered.');
+      return;
+    }
+
+    const updated = { ...activePlayer, basePrice: newPrice };
+    setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updated : p));
+    setCurrentBid(newPrice);
+    liveSelectPlayer(activePlayer.id, newPrice);
+    try {
+      await apiUpdatePlayer(activePlayer.id, { basePrice: newPrice });
+    } catch (err) {
+      console.warn('Failed to persist base price:', err);
+    }
+  };
 
   const availablePlayers = players.filter(p => (p.status === 'available' || p.status === 'unsold') && (p.isPlayingNEPL !== false));
 
@@ -68,9 +90,9 @@ export default function AuctionRoom({
   }, [players, activePlayerId]);
 
   const activePlayer = players.find(p => p.id === activePlayerId);
-  const [currentBid, setCurrentBid] = useState(activePlayer ? activePlayer.basePrice : 500);
+  const effectiveBasePrice = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+  const [currentBid, setCurrentBid] = useState(effectiveBasePrice);
   const [highBidder, setHighBidder] = useState(null);
-  const [autoSimulate, setAutoSimulate] = useState(false);
   const [selectedBiddingTeamId, setSelectedBiddingTeamId] = useState(teams[0]?.id || null);
 
   // Sync when active player changes locally
@@ -82,11 +104,20 @@ export default function AuctionRoom({
         const buyer = teams.find(t => t.id === activePlayer.soldTo);
         setHighBidder(buyer || null);
       } else {
-        setCurrentBid(activePlayer.basePrice);
+        const eff = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+        setCurrentBid(eff);
         setHighBidder(null);
       }
     }
-  }, [activePlayerId, activePlayer, teams]);
+  }, [activePlayerId, activePlayer, teams, tournamentSettings?.defaultBasePrice]);
+
+  // Sync when supreme user changes defaultBasePrice and no high bidder exists
+  useEffect(() => {
+    if (activePlayer && activePlayer.status !== 'sold' && !highBidder) {
+      const eff = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+      setCurrentBid(eff);
+    }
+  }, [tournamentSettings?.defaultBasePrice, activePlayer, highBidder]);
 
   // ── Multi-Device Real-Time Live Streaming Socket Listeners ────────────────
   useEffect(() => {
@@ -112,7 +143,8 @@ export default function AuctionRoom({
       if (data && data.activePlayerId) {
         setActivePlayerId(data.activePlayerId);
         lastActivePlayerIdRef.current = data.activePlayerId;
-        setCurrentBid(data.currentBid || 500);
+        const eff = data.currentBid || tournamentSettings?.defaultBasePrice || 100;
+        setCurrentBid(eff);
         setHighBidder(null);
       }
     };
@@ -132,10 +164,16 @@ export default function AuctionRoom({
     const handlePlayerSold = () => {
       soundFx.playSold();
       confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
+      setHighBidder(null);
+      setIsTimerRunning(false);
+      setTimeLeft(30);
     };
 
     const handlePlayerUnsold = () => {
       soundFx.playUnsold();
+      setHighBidder(null);
+      setIsTimerRunning(false);
+      setTimeLeft(30);
     };
 
     const handleBidRevoked = (data) => {
@@ -170,30 +208,7 @@ export default function AuctionRoom({
     };
   }, []);
 
-  useEffect(() => {
-    let timer;
-    if (autoSimulate && activePlayer && activePlayer.status === 'available') {
-      timer = setInterval(() => {
-        const validTeams = teams.filter(t => {
-          const isCurrentHigh = highBidder?.id === t.id;
-          const remainingPurse = t.totalPurse - t.spentPurse;
-          const maxCapacity = t.maxSquadSize || 10;
-          const isFull = (t.squad?.length || 0) >= maxCapacity;
-          return !isCurrentHigh && !isFull && remainingPurse >= currentBid + 50;
-        });
 
-        if (validTeams.length > 0) {
-          const randomTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
-          const increment = getBidIncrement(currentBid);
-          const nextBid = currentBid + increment;
-          handlePlaceBid(randomTeam, nextBid);
-        } else if (highBidder) {
-          handleMarkSold();
-        }
-      }, 1800);
-    }
-    return () => clearInterval(timer);
-  }, [autoSimulate, currentBid, highBidder, activePlayer]);
 
   const handlePlaceBid = (team, newBidAmount) => {
     if (!activePlayer || activePlayer.status === 'sold') return;
@@ -256,7 +271,7 @@ export default function AuctionRoom({
   const handleAdminRevokeBid = () => {
     if (!isSuperAdmin || !highBidder || !activePlayer) return;
     if (window.confirm(`⚡ SUPER ADMIN: Revoke high bid of ₹${currentBid} PTS by ${highBidder.name}?`)) {
-      const baseVal = activePlayer.basePrice;
+      const baseVal = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
       setCurrentBid(baseVal);
       setHighBidder(null);
       const revokeLog = {
@@ -356,11 +371,20 @@ export default function AuctionRoom({
     liveMarkSold(activePlayer.id, buyerTeamId, soldPrice, updatedPlayer, updatedTeam, soldLogItem);
 
     setTimeout(() => {
-      const nextP = players.find(p => p.id !== activePlayer.id && p.status === 'available');
+      const nextAvailable = players.find(p => p.id !== activePlayer.id && p.status === 'available' && p.isPlayingNEPL !== false);
+      const nextUnsold = players.find(p => p.id !== activePlayer.id && p.status === 'unsold' && p.isPlayingNEPL !== false);
+      const nextP = nextAvailable || nextUnsold;
+
+      setHighBidder(null);
+      setTimeLeft(30);
+      setIsTimerRunning(false);
+
       if (nextP) {
+        const nextPrice = getPlayerStartingBid(nextP, tournamentSettings?.defaultBasePrice);
         setActivePlayerId(nextP.id);
+        setCurrentBid(nextPrice);
         lastActivePlayerIdRef.current = nextP.id;
-        liveSelectPlayer(nextP.id, nextP.basePrice);
+        liveSelectPlayer(nextP.id, nextPrice);
       }
       setIsProcessing(false);
     }, 1200);
@@ -369,9 +393,16 @@ export default function AuctionRoom({
   const handleMarkUnsold = () => {
     if (!activePlayer) return;
     soundFx.playUnsold();
-    const updatedPlayer = { ...activePlayer, status: 'unsold' };
+    const updatedPlayer = { 
+      ...activePlayer, 
+      status: 'unsold',
+      soldPrice: 0,
+      soldTo: null
+    };
+
     setPlayers(prev => prev.map(p => p.id === activePlayer.id ? updatedPlayer : p));
     apiUpdatePlayer(activePlayer.id, updatedPlayer).catch(err => console.warn('MongoDB player unsold update err:', err));
+
     const unsoldLogItem = {
       id: Date.now().toString(),
       type: 'UNSOLD',
@@ -383,11 +414,24 @@ export default function AuctionRoom({
     // 📡 Broadcast player unsold across all connected devices in real time!
     liveMarkUnsold(activePlayer.id, updatedPlayer, unsoldLogItem);
 
-    const nextP = players.find(p => p.id !== activePlayer.id && p.status === 'available');
+    // Reset bidding state
+    setHighBidder(null);
+    setIsTimerRunning(false);
+    setTimeLeft(30);
+
+    // Find next available player, or if none, next unsold player
+    const nextAvailable = players.find(p => p.id !== activePlayer.id && p.status === 'available' && p.isPlayingNEPL !== false);
+    const nextUnsold = players.find(p => p.id !== activePlayer.id && p.status === 'unsold' && p.isPlayingNEPL !== false);
+    const nextP = nextAvailable || nextUnsold;
+
     if (nextP) {
+      const nextPrice = getPlayerStartingBid(nextP, tournamentSettings?.defaultBasePrice);
       setActivePlayerId(nextP.id);
+      setCurrentBid(nextPrice);
       lastActivePlayerIdRef.current = nextP.id;
-      liveSelectPlayer(nextP.id, nextP.basePrice);
+      liveSelectPlayer(nextP.id, nextPrice);
+    } else {
+      setCurrentBid(getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice));
     }
   };
 
@@ -397,7 +441,10 @@ export default function AuctionRoom({
       const nextP = players[i + 1];
       setActivePlayerId(nextP.id);
       lastActivePlayerIdRef.current = nextP.id;
-      liveSelectPlayer(nextP.id, nextP.basePrice);
+      const nextPrice = getPlayerStartingBid(nextP, tournamentSettings?.defaultBasePrice);
+      setCurrentBid(nextPrice);
+      setHighBidder(null);
+      liveSelectPlayer(nextP.id, nextPrice);
     }
   };
 
@@ -407,7 +454,10 @@ export default function AuctionRoom({
       const prevP = players[i - 1];
       setActivePlayerId(prevP.id);
       lastActivePlayerIdRef.current = prevP.id;
-      liveSelectPlayer(prevP.id, prevP.basePrice);
+      const prevPrice = getPlayerStartingBid(prevP, tournamentSettings?.defaultBasePrice);
+      setCurrentBid(prevPrice);
+      setHighBidder(null);
+      liveSelectPlayer(prevP.id, prevPrice);
     }
   };
 
@@ -417,7 +467,10 @@ export default function AuctionRoom({
       const randP = unsold[Math.floor(Math.random() * unsold.length)];
       setActivePlayerId(randP.id);
       lastActivePlayerIdRef.current = randP.id;
-      liveSelectPlayer(randP.id, randP.basePrice);
+      const randPrice = getPlayerStartingBid(randP, tournamentSettings?.defaultBasePrice);
+      setCurrentBid(randPrice);
+      setHighBidder(null);
+      liveSelectPlayer(randP.id, randPrice);
     }
   };
 
@@ -456,19 +509,7 @@ export default function AuctionRoom({
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          {/* Auto-Sim — superuser only */}
-          {can('canOverrideBid') && (
-            <button
-              onClick={() => setAutoSimulate(!autoSimulate)}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl font-bold text-xs border transition ${autoSimulate
-                ? 'bg-terracotta-600/20 text-terracotta-300 border-terracotta-500/50 animate-pulse'
-                : 'bg-warm-900 text-sand-500 border-warm-700 hover:text-sand-200'
-                }`}
-            >
-              {autoSimulate ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 text-cricket-emerald" />}
-              <span>{autoSimulate ? 'Simulating…' : 'Auto-Bid Demo'}</span>
-            </button>
-          )}
+
         </div>
       </div>
 
@@ -571,12 +612,31 @@ export default function AuctionRoom({
                   {/* Price Banner */}
                   <div className="grid grid-cols-2 gap-3 bg-[#f4efe6] dark:bg-[#070b14]/90 p-4 rounded-2xl border border-[#e2dacc] dark:border-cyan-500/20 shadow-sm">
                     <div>
-                      <span className="text-slate-600 dark:text-slate-400 text-xs font-extrabold uppercase tracking-wider block mb-0.5">Base Price</span>
-                      <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-sand-200 font-mono">₹{activePlayer.basePrice} PTS</span>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-slate-600 dark:text-slate-400 text-xs font-extrabold uppercase tracking-wider block">Base Price</span>
+                        {(isSuperAdmin || can('canResetData')) && !highBidder && activePlayer.status !== 'sold' && (
+                          <button
+                            type="button"
+                            onClick={handleEditActivePlayerBasePrice}
+                            className="text-[10px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer font-sans"
+                            title="Edit active player base price"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-sand-200 font-mono">
+                        ₹{(activePlayer.basePrice || tournamentSettings?.defaultBasePrice || 100).toLocaleString()} PTS
+                      </span>
                     </div>
                     <div className="border-l border-[#d4ccbd] dark:border-slate-800 pl-3">
-                      <span className="text-amber-700 dark:text-[#c9a227] text-xs font-extrabold uppercase tracking-wider block mb-0.5">Current Bid</span>
-                      <span className="text-2xl sm:text-3xl font-black text-amber-700 dark:text-[#c9a227] font-mono">₹{currentBid} PTS</span>
+                      <span className="text-amber-700 dark:text-[#c9a227] text-xs font-extrabold uppercase tracking-wider block mb-0.5">
+                        {highBidder ? 'Current High Bid' : 'Current Bid'}
+                      </span>
+                      <span className="text-2xl sm:text-3xl font-black text-amber-700 dark:text-[#c9a227] font-mono">
+                        ₹{currentBid.toLocaleString()} PTS
+                      </span>
                     </div>
                   </div>
 
@@ -613,7 +673,10 @@ export default function AuctionRoom({
                             <span className="font-extrabold text-sand-100 text-base">{highBidder.name}</span>
                           </div>
                         </div>
-                        <span className="text-xl font-black text-[#c9a227] font-mono">₹{currentBid} PTS</span>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/90 block">Current High Bid</span>
+                          <span className="text-xl font-black text-[#c9a227] font-mono">₹{currentBid.toLocaleString()} PTS</span>
+                        </div>
                       </div>
 
                       {/* Super Admin Revoke & Reduce Controls */}
@@ -629,7 +692,8 @@ export default function AuctionRoom({
                           </button>
                           <button
                             onClick={() => {
-                              setReducedBidInput(Math.max(activePlayer.basePrice, currentBid - 100));
+                              const step = tournamentSettings?.bidIncrementStep || (activePlayer?.basePrice || 100);
+                              setReducedBidInput(Math.max(activePlayer.basePrice, currentBid - step));
                               setShowReduceModal(true);
                             }}
                             className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
@@ -671,15 +735,15 @@ export default function AuctionRoom({
                     <span className="w-2.5 h-2.5 rounded-full bg-[#c9a227] animate-pulse shadow-[0_0_10px_#c9a227]" />
                     <div>
                       <span className="text-xs font-bold text-sand-200 block">
-                        Current Bidding Slab: <span className="text-[#c9a227] font-extrabold">{getBidSlabInfo(currentBid).label}</span> ({getBidSlabInfo(currentBid).rangeText})
+                        Current Bidding Slab: <span className="text-[#c9a227] font-extrabold">{getBidSlabInfo(currentBid, tournamentSettings?.bidIncrementStep, activePlayer?.basePrice).label}</span> ({getBidSlabInfo(currentBid, tournamentSettings?.bidIncrementStep, activePlayer?.basePrice).rangeText})
                       </span>
                       <span className="text-[11px] text-sand-500 font-mono">
-                        Rule Minimum Step: <strong className="text-cricket-emerald">+₹{getBidIncrement(currentBid)} PTS</strong>
+                        Rule Minimum Step: <strong className="text-cricket-emerald">+₹{getBidIncrement(currentBid, tournamentSettings?.bidIncrementStep, activePlayer?.basePrice).toLocaleString()} PTS</strong>
                       </span>
                     </div>
                   </div>
                   <div className="text-right font-mono text-xs text-sand-400">
-                    Next Standard Bid: <span className="text-cricket-emerald font-extrabold text-sm">₹{(highBidder ? currentBid + getBidIncrement(currentBid) : activePlayer.basePrice).toLocaleString()} PTS</span>
+                    Next Standard Bid: <span className="text-cricket-emerald font-extrabold text-sm">₹{(highBidder ? currentBid + getBidIncrement(currentBid, tournamentSettings?.bidIncrementStep, effectiveBasePrice) : effectiveBasePrice).toLocaleString()} PTS</span>
                   </div>
                 </div>
               )}
@@ -691,11 +755,17 @@ export default function AuctionRoom({
                   const remainingPurse = team.totalPurse - team.spentPurse;
                   const maxCap = team.maxSquadSize || 10;
                   const isSquadFull = (team.squad?.length || 0) >= maxCap;
-                  const stdInc = getBidIncrement(currentBid);
-                  const canAfford = remainingPurse >= (highBidder ? currentBid + stdInc : activePlayer.basePrice);
+                  const effectiveBase = getPlayerStartingBid(activePlayer, tournamentSettings?.defaultBasePrice);
+                  const stdInc = getBidIncrement(currentBid, tournamentSettings?.bidIncrementStep, effectiveBase);
+                  const nextBidVal = highBidder ? currentBid + stdInc : effectiveBase;
+                  const canAfford = remainingPurse >= nextBidVal;
 
-                  // Standard dynamic increment + optional quick increments
-                  const increments = Array.from(new Set([stdInc, 100, 200, 500])).sort((a, b) => a - b);
+                  // Standard dynamic increment + quick increment options scaled to stdInc
+                  const increments = Array.from(new Set([
+                    stdInc,
+                    stdInc * 2,
+                    stdInc * 5
+                  ])).filter(inc => inc > 0).sort((a, b) => a - b);
 
                   return (
                     <div
@@ -724,44 +794,50 @@ export default function AuctionRoom({
                           <div>
                             <h4 className="font-extrabold text-sand-100 text-sm sm:text-base font-sans leading-tight">{team.name}</h4>
                             <p className="text-[10px] text-sand-600 font-mono">
-                              Purse: <span className="text-cricket-emerald font-bold">₹{remainingPurse}</span> · Squad: <span className="text-[#c9a227] font-bold">{team.squad?.length || 0}/{maxCap}</span>
+                              Purse: <span className="text-cricket-emerald font-bold">₹{remainingPurse.toLocaleString()}</span> · Squad: <span className="text-[#c9a227] font-bold">{team.squad?.length || 0}/{maxCap}</span>
                             </p>
                           </div>
                         </div>
                         {isLeading && (
-                          <span className="px-2 py-0.5 rounded-full bg-[#c9a227] text-warm-950 font-extrabold text-[9px] uppercase tracking-wider">
-                            HIGH BID
+                          <span className="px-2.5 py-1 rounded-full bg-[#c9a227] text-warm-950 font-black text-[10px] uppercase tracking-wider shadow-sm flex items-center gap-1">
+                            <span>👑 HIGH BID:</span>
+                            <span>₹{currentBid.toLocaleString()} PTS</span>
                           </span>
                         )}
                       </div>
 
-                      {/* Bid increment buttons */}
-                      <div className="flex items-center gap-1.5">
-                        {increments.map((inc) => {
-                          const isStandardRuleStep = inc === stdInc;
-                          const nextBidVal = highBidder ? currentBid + inc : activePlayer.basePrice;
-                          const isDisabled = !canBid || isLeading || remainingPurse < nextBidVal || isSquadFull || activePlayer.status === 'sold';
-                          return (
-                            <button
-                              key={inc}
-                              disabled={isDisabled}
-                              onClick={() => {
-                                setSelectedBiddingTeamId(team.id);
-                                handlePlaceBid(team, nextBidVal);
-                              }}
-                              className={`flex-1 py-2 rounded-xl text-xs font-bold transition font-mono ${isDisabled
+                      {/* Bid Action Section */}
+                      {isLeading ? (
+                        <div className="p-2.5 rounded-xl bg-[#c9a227]/20 border border-[#c9a227]/40 text-center">
+                          <span className="text-xs font-bold text-amber-300 font-sans block">
+                            Leading with Current High Bid of <strong className="text-white font-mono">₹{currentBid.toLocaleString()} PTS</strong>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <button
+                            disabled={!canBid || remainingPurse < nextBidVal || isSquadFull || activePlayer.status === 'sold'}
+                            onClick={() => {
+                              setSelectedBiddingTeamId(team.id);
+                              handlePlaceBid(team, nextBidVal);
+                            }}
+                            className={`w-full py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition font-mono flex items-center justify-between ${
+                              !canBid || remainingPurse < nextBidVal || isSquadFull || activePlayer.status === 'sold'
                                 ? 'bg-warm-950 text-sand-700 border border-warm-900 cursor-not-allowed'
-                                : isStandardRuleStep
-                                  ? 'bg-terracotta-600 hover:bg-terracotta-500 text-white border border-terracotta-400 shadow-md scale-[1.02] active:scale-95'
-                                  : 'bg-warm-800 hover:bg-cricket-emerald hover:text-warm-950 text-cricket-emerald border border-cricket-emerald/30 active:scale-95'
-                                }`}
-                              title={isStandardRuleStep ? `Standard Tier Rule Step (+₹${inc})` : `Custom Increment (+₹${inc})`}
-                            >
-                              +{inc}{isStandardRuleStep ? '⚡' : ''}
-                            </button>
-                          );
-                        })}
-                      </div>
+                                : 'bg-gradient-to-r from-terracotta-600 to-terracotta-500 hover:from-terracotta-500 hover:to-terracotta-400 text-white border border-terracotta-400 shadow-md active:scale-98 cursor-pointer'
+                            }`}
+                            title={highBidder ? `Increase bid by +₹${stdInc.toLocaleString()} → ₹${nextBidVal.toLocaleString()} PTS` : `Place opening bid at Base Price ₹${nextBidVal.toLocaleString()} PTS`}
+                          >
+                            <span className="flex items-center gap-1.5 truncate">
+                              <span>⚡</span>
+                              <span>{highBidder ? `Bid ₹${nextBidVal.toLocaleString()}` : `Opening Bid ₹${nextBidVal.toLocaleString()}`}</span>
+                            </span>
+                            <span className="text-[11px] opacity-90 font-mono shrink-0 pl-1">
+                              {highBidder ? `(+₹${stdInc.toLocaleString()})` : 'Base Price'}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

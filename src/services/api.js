@@ -225,3 +225,16 @@ export async function deleteUserApi(email) {
 export async function generateEmailApi(name, exclude = '') {
   return apiFetch(`/auth/generate-email?name=${encodeURIComponent(name)}${exclude ? `&exclude=${encodeURIComponent(exclude)}` : ''}`);
 }
+
+// ── Tournament Brand & Identity Settings ─────────────────────────────────────
+
+export async function fetchTournamentSettings() {
+  return apiFetch('/settings');
+}
+
+export async function saveTournamentSettings(settings) {
+  return apiFetch('/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { NEFL_FORMAT_DETAILS } from '../data/neflRulesData';
 import { useAuth } from '../auth/AuthContext';
+import { useTournament } from '../context/TournamentContext';
 import { addRule as apiAddRule, isMongoDB } from '../services/api';
 
 const DEFAULT_FORMAT_SPECS = {
@@ -35,8 +36,14 @@ const DEFAULT_FORMAT_SPECS = {
 
 export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
   const { user, can } = useAuth();
+  const { tournamentSettings } = useTournament();
   const isSuperAdmin = user?.role === 'superuser';
   const canManage = isSuperAdmin || can('canResetData') || can('canManageUsers');
+
+  const tourShort = tournamentSettings?.shortCode || 'NEPL';
+  const tourName = tournamentSettings?.tournamentName || 'Nyati Era';
+  const tourSub = tournamentSettings?.subtitle || 'Box Cricket League';
+  const tourEdition = tournamentSettings?.edition || `${new Date().getFullYear()}`;
 
   // ── Persistent Editable Format Specifications ──
   const [formatSpecs, setFormatSpecs] = useState(() => {
@@ -143,7 +150,7 @@ export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
     const formatRuleDoc = {
       id: 'rule-nefl-format-highlights',
       number: '00-SPEC',
-      title: 'NEPL TOURNAMENT FORMAT SPECIFICATIONS',
+      title: `${tourName.toUpperCase()} TOURNAMENT FORMAT SPECIFICATIONS`,
       desc: `Innings: ${editingSpecs.inningsLength.value} (${editingSpecs.inningsLength.detail}) | Squad: ${editingSpecs.squadSize.value} (${editingSpecs.squadSize.detail}) | Fielding: ${editingSpecs.fieldRestrictions.value} (${editingSpecs.fieldRestrictions.detail}) | Boundary: ${editingSpecs.boundaryBonuses.value} (${editingSpecs.boundaryBonuses.detail})`,
       icon: 'Sparkles',
       formatSpecs: editingSpecs,
@@ -173,7 +180,7 @@ export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
 
   const handleResetDefaults = async () => {
     if (!isSuperAdmin) return;
-    if (!window.confirm("Reset all 4 tournament format specifications back to official NEPL defaults?")) return;
+    if (!window.confirm(`Reset all 4 tournament format specifications back to official ${tourName} defaults?`)) return;
 
     setEditingSpecs(DEFAULT_FORMAT_SPECS);
     setFormatSpecs(DEFAULT_FORMAT_SPECS);
@@ -215,9 +222,10 @@ export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
             </div>
 
             <h2 className="text-2xl sm:text-4xl font-extrabold font-sans text-white tracking-tight">
-              NEPL (Nyati Era Premiere League) Tournament Format
+              {tourName} Tournament Format
             </h2>
             <p className="text-sm sm:text-base text-slate-300 max-w-2xl mt-1.5 leading-relaxed">
+              {tourSub && <span className="text-cyan-400 font-semibold mr-1.5">[{tourSub}]</span>}
               {formatSpecs.inningsLength.value} Per Inning ({formatSpecs.inningsLength.detail}) · {formatSpecs.squadSize.value} Squads ({formatSpecs.squadSize.detail}) · {formatSpecs.fieldRestrictions.value} Fielding Grid · {formatSpecs.boundaryBonuses.value} Net Bonuses
             </p>
           </div>
@@ -686,7 +694,7 @@ export default function NEFLFormatView({ onOpenAiChat, rules, setRules }) {
 
           <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/25 rounded-2xl text-rose-300 text-xs flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0" />
-            <span>Fielding violation = NO BALL. No Free Hits allowed in NEPL format.</span>
+            <span>Fielding violation = NO BALL. No Free Hits allowed in {tourName} format.</span>
           </div>
         </div>
 

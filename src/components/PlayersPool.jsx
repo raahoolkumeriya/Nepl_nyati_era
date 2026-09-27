@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Search, 
@@ -26,6 +26,7 @@ import { generateUniqueNeplEmail } from '../services/auth';
 import { compressImage } from '../utils/imageCompressor';
 import { updatePlayer as apiUpdatePlayer } from '../services/api';
 import { CURRENT_YEAR, CURRENT_SEASON_TAG } from '../utils/season';
+import { useTournament } from '../context/TournamentContext';
 
 export default function PlayersPool({ 
   players = [], 
@@ -37,6 +38,9 @@ export default function PlayersPool({
   canDelete = true 
 }) {
   const { can, addAuctioneer, revokeAuctioneerAccess, usersList } = useAuth();
+  const { tournamentSettings } = useTournament();
+  const defaultBase = tournamentSettings?.defaultBasePrice || 100;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -52,7 +56,7 @@ export default function PlayersPool({
     name: '',
     role: 'Batting All-Rounder',
     category: 'Category B',
-    basePrice: 100,
+    basePrice: defaultBase,
     matches: 10,
     runs: 150,
     avg: 15.0,
@@ -67,13 +71,20 @@ export default function PlayersPool({
     tournamentSession: CURRENT_SEASON_TAG
   });
 
+  useEffect(() => {
+    setNewPlayer(prev => ({
+      ...prev,
+      basePrice: defaultBase
+    }));
+  }, [defaultBase]);
+
   // Super Admin Edit Player State
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
     role: 'Batting All-Rounder',
     category: 'Category B',
-    basePrice: 100,
+    basePrice: defaultBase,
     cricHeroesUrl: 'https://cricheroes.com',
     captainOfTeamId: '',
     grantAuctioneerAccess: false,
@@ -96,7 +107,7 @@ export default function PlayersPool({
       name: player.name,
       role: player.role,
       category: player.category || 'Category B',
-      basePrice: player.basePrice || 100,
+      basePrice: player.basePrice || defaultBase,
       cricHeroesUrl: player.cricHeroesUrl || 'https://cricheroes.com',
       captainOfTeamId: assignedTeamId || '',
       grantAuctioneerAccess: Boolean(player.isAuctioneer),
@@ -388,7 +399,7 @@ export default function PlayersPool({
       name: '',
       role: 'Batting All-Rounder',
       category: 'Category B',
-      basePrice: 100,
+      basePrice: defaultBase,
       matches: 10,
       runs: 150,
       avg: 15.0,
@@ -441,7 +452,7 @@ export default function PlayersPool({
               <span>Squad Directory ({players.length} Players)</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-sand-100 tracking-tight font-sans">
-              NEPL Players Pool & Roster
+              Players Pool & Roster
             </h2>
             <p className="text-sand-400 text-xs mt-2 max-w-xl">
               Browse stats, roles, categories, and auction status for all registered players in Season {CURRENT_YEAR}.
@@ -745,7 +756,7 @@ export default function PlayersPool({
               <div className="pt-3 border-t border-warm-800/60 flex items-center justify-between gap-2">
                 <div>
                   <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 font-mono block uppercase font-bold tracking-wider">Base Price</span>
-                  <span className="text-sm sm:text-base font-black text-slate-900 dark:text-sand-200 font-mono">₹{player.basePrice}</span>
+                  <span className="text-sm sm:text-base font-black text-slate-900 dark:text-sand-200 font-mono">₹{(player.basePrice || defaultBase).toLocaleString()}</span>
                 </div>
                 <div>
                   {isCap && buyerTeam ? (
@@ -843,23 +854,23 @@ export default function PlayersPool({
                     onChange={e => {
                       const cat = e.target.value;
                       let defaultAvatar = '/avatars/male.png';
-                      let defaultBase = 100;
-                      if (cat === 'Female') { defaultAvatar = '/avatars/female.png'; defaultBase = 100; }
-                      else if (cat === 'Master (7-10 yrs)') { defaultAvatar = '/avatars/master.png'; defaultBase = 100; }
-                      else if (cat === 'Super Master (11-13 yrs)') { defaultAvatar = '/avatars/super_master.png'; defaultBase = 100; }
-                      else if (cat === 'Icon') { defaultBase = 300; }
-                      else if (cat === 'Category A') { defaultBase = 200; }
-                      setNewPlayer({ ...newPlayer, category: cat, avatarUrl: defaultAvatar, basePrice: defaultBase });
+                      let baseVal = defaultBase;
+                      if (cat === 'Female') { defaultAvatar = '/avatars/female.png'; }
+                      else if (cat === 'Master (7-10 yrs)') { defaultAvatar = '/avatars/master.png'; }
+                      else if (cat === 'Super Master (11-13 yrs)') { defaultAvatar = '/avatars/super_master.png'; }
+                      else if (cat === 'Icon') { baseVal = Math.round(defaultBase * 3); }
+                      else if (cat === 'Category A') { baseVal = Math.round(defaultBase * 2); }
+                      setNewPlayer({ ...newPlayer, category: cat, avatarUrl: defaultAvatar, basePrice: baseVal });
                     }} 
                     className="warm-input cursor-pointer"
                   >
-                    <option value="Male">Male (Adult) — Base: 100 PTS</option>
-                    <option value="Female">Female (Adult) — Base: 100 PTS</option>
-                    <option value="Master (7-10 yrs)">Master (7-10 yrs) — Base: 100 PTS</option>
-                    <option value="Super Master (11-13 yrs)">Super Master (11-13 yrs) — Base: 100 PTS</option>
-                    <option value="Category B">Category B (Default Base: 100 PTS)</option>
-                    <option value="Category A">Category A (Base: 200 PTS)</option>
-                    <option value="Icon">Icon (Base: 300 PTS)</option>
+                    <option value="Male">Male (Adult) — Base: ₹{defaultBase} PTS</option>
+                    <option value="Female">Female (Adult) — Base: ₹{defaultBase} PTS</option>
+                    <option value="Master (7-10 yrs)">Master (7-10 yrs) — Base: ₹{defaultBase} PTS</option>
+                    <option value="Super Master (11-13 yrs)">Super Master (11-13 yrs) — Base: ₹{defaultBase} PTS</option>
+                    <option value="Category B">Category B (Default Base: ₹{defaultBase} PTS)</option>
+                    <option value="Category A">Category A (Base: ₹{Math.round(defaultBase * 2)} PTS)</option>
+                    <option value="Icon">Icon (Base: ₹{Math.round(defaultBase * 3)} PTS)</option>
                   </select>
                 </div>
                 <div>
@@ -1088,8 +1099,8 @@ export default function PlayersPool({
                   <label className="block text-xs font-bold text-slate-400 mb-1">Base Price (PTS)</label>
                   <input
                     type="number"
-                    min="50"
-                    step="50"
+                    min={defaultBase}
+                    step={tournamentSettings?.bidIncrementStep || defaultBase}
                     value={editFormData.basePrice}
                     onChange={(e) => setEditFormData({ ...editFormData, basePrice: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm font-bold focus:outline-none focus:border-cyan-400"

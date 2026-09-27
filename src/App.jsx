@@ -11,12 +11,13 @@ import GeminiChatBot from './components/GeminiChatBot';
 import LoginPage from './auth/LoginPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { TournamentProvider, useTournament } from './context/TournamentContext';
 import { TOURNAMENT_RULES } from './data/initialData';
 import { soundFx } from './utils/audio';
 import { useTheme } from './utils/theme';
-import { 
-  fetchPlayers, savePlayers, 
-  fetchTeams, saveTeams, 
+import {
+  fetchPlayers, savePlayers,
+  fetchTeams, saveTeams,
   fetchHistory, saveHistory,
   fetchRules, saveRules,
   fetchMatches, saveMatches,
@@ -29,6 +30,7 @@ import { getSocket, liveBroadcastReset } from './services/socket';
 function AppInner() {
   const { user, isAuthenticated, can } = useAuth();
   const { theme } = useTheme();
+  const { tournamentSettings } = useTournament();
   const [activeTab, setActiveTab] = useState('auction');
   const [isProjectorMode, setIsProjectorMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -41,6 +43,47 @@ function AppInner() {
   useEffect(() => {
     soundFx.enabled = soundEnabled;
   }, [soundEnabled]);
+
+  // Modern View Transitions API for seamless tab switching
+  const handleTabChange = useCallback((newTab) => {
+    if (newTab === activeTab) return;
+    if (typeof document !== 'undefined' && document.startViewTransition) {
+      document.startViewTransition(() => {
+        setActiveTab(newTab);
+      });
+    } else {
+      setActiveTab(newTab);
+    }
+  }, [activeTab]);
+
+  // Fallback for browsers without native CSS animation-timeline: scroll()
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.CSS && CSS.supports && CSS.supports('animation-timeline', 'scroll()')) return;
+
+    const progressEl = document.getElementById('scroll-progress');
+    if (!progressEl) return;
+
+    const handleScroll = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollable <= 0) return;
+      const progress = window.scrollY / scrollable;
+      progressEl.style.transform = `scaleX(${progress})`;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Ensure active tab matches current user permissions
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (activeTab === 'auction' && !can('canViewAuction')) {
+      setActiveTab('teams');
+    } else if (activeTab === 'schedule' && !can('canViewSchedule')) {
+      setActiveTab(can('canViewAuction') ? 'auction' : 'teams');
+    }
+  }, [isAuthenticated, activeTab, can]);
 
   // ── Teams state ──────────────────────────────────────────────────────────
   const [teams, setTeams] = useState(() => {
@@ -88,13 +131,13 @@ function AppInner() {
       setIsLoading(false);
       return;
     }
-    
+
     async function loadFromMongoDB() {
       setIsLoading(true);
       try {
         const serverUp = await checkServerHealth();
         setIsDbConnected(serverUp);
-        
+
         if (serverUp) {
           const [dbPlayers, dbTeams, dbHistory, dbRules, dbMatches] = await Promise.all([
             fetchPlayers(),
@@ -118,7 +161,7 @@ function AppInner() {
         setIsLoading(false);
       }
     }
-    
+
     loadFromMongoDB();
   }, [isAuthenticated]);
 
@@ -235,23 +278,23 @@ function AppInner() {
 
   // ── Persist to localStorage (always as fallback) ──────────────────────────
   useEffect(() => {
-    try { localStorage.setItem('nepl_teams', JSON.stringify(teams)); } catch {}
+    try { localStorage.setItem('nepl_teams', JSON.stringify(teams)); } catch { }
   }, [teams]);
 
   useEffect(() => {
-    try { localStorage.setItem('nepl_players', JSON.stringify(players)); } catch {}
+    try { localStorage.setItem('nepl_players', JSON.stringify(players)); } catch { }
   }, [players]);
 
   useEffect(() => {
-    try { localStorage.setItem('nepl_history', JSON.stringify(history)); } catch {}
+    try { localStorage.setItem('nepl_history', JSON.stringify(history)); } catch { }
   }, [history]);
 
   useEffect(() => {
-    try { localStorage.setItem('nepl_rules', JSON.stringify(rules)); } catch {}
+    try { localStorage.setItem('nepl_rules', JSON.stringify(rules)); } catch { }
   }, [rules]);
 
   useEffect(() => {
-    try { localStorage.setItem('nepl_matches', JSON.stringify(matches)); } catch {}
+    try { localStorage.setItem('nepl_matches', JSON.stringify(matches)); } catch { }
   }, [matches]);
 
   // ── Persist to MongoDB Atlas (debounced) ──────────────────────────────────
@@ -302,19 +345,79 @@ function AppInner() {
       return;
     }
 
-    const currentYear = new Date().getFullYear();
     const input = window.prompt(
-      "⚠️ DANGER ZONE: YOU ARE ABOUT TO ERASE ALL LIVE AUCTION DATA FROM MONGODB ATLAS!\n\n" +
-      "This will permanently purge:\n" +
-      "• All registered teams & purse records\n" +
-      "• All player pool rosters & sold histories\n" +
-      "• All live auction bid logs\n" +
-      "• All match schedules and scorecards\n\n" +
-      "To confirm this action, type the exact phrase below:\n" +
-      `RESET NEPL ${currentYear} MONGODB DATA`
+      "👑 SUPREME MASTER AUCTION CONTROL\n\n" +
+      "Select an option by typing 1 or 2:\n\n" +
+      "1: WIPE BIDDING HISTORY & START FRESH AUCTION SETUP\n" +
+      "   • Purges all live bid logs and auction history\n" +
+      "   • Resets all players back to 'Available' (unsold)\n" +
+      "   • Restores 100% purse to all teams (spent = 0)\n" +
+      "   • Cleans live auction room session\n\n" +
+      "2: COMPLETE FACTORY PURGE\n" +
+      "   • Purges all players, teams, matches, and history\n\n" +
+      "Type '1' to Wipe Bids & Start Fresh, or '2' for Full Purge:"
     );
 
-    if (input === `RESET NEPL ${currentYear} MONGODB DATA` || input === "RESET NEPL MONGODB DATA" || input === "RESET NEPL 2026 MONGODB DATA") {
+    if (!input) return;
+    const clean = input.trim().toLowerCase();
+
+    if (clean === '1' || clean.includes('wipe') || clean.includes('fresh') || clean === 'yes' || clean === 'ok') {
+      if (window.confirm("🔴 Confirm: Wipe all bidding history and reset all players and team purses to start a clean new auction setup?")) {
+        const freshPlayers = (players || []).map(p => ({
+          ...p,
+          status: 'available',
+          soldPrice: 0,
+          soldTo: null,
+          currentBid: p.basePrice || 100,
+          bidHistory: []
+        }));
+
+        const startupPurse = Number(tournamentSettings?.startupPurse) || 10000;
+
+        const OFFICIAL_6_TEAMS = [
+          { id: 'team-1', name: 'Team A', shortName: 'TMA', owner: 'Team A owner', color: '#3b82f6', logo: '🦁', totalPurse: startupPurse, spentPurse: 0, maxSquadSize: 10, playersCount: 0, squad: [] },
+          { id: 'team-2', name: 'Team B', shortName: 'TMB', owner: 'Team B owner', color: '#ef4444', logo: '🔥', totalPurse: startupPurse, spentPurse: 0, maxSquadSize: 10, playersCount: 0, squad: [] },
+          { id: 'team-3', name: 'Team C', shortName: 'TMC', owner: 'Team C owner', color: '#06b6d4', logo: '⚡', totalPurse: startupPurse, spentPurse: 0, maxSquadSize: 10, playersCount: 0, squad: [] },
+          { id: 'team-4', name: 'Team D', shortName: 'TMD', owner: 'Team D owner', color: '#10b981', logo: '🛡️', totalPurse: startupPurse, spentPurse: 0, maxSquadSize: 10, playersCount: 0, squad: [] },
+          { id: 'team-5', name: 'Team E', shortName: 'TME', owner: 'Team E owner', color: '#f59e0b', logo: '👑', totalPurse: startupPurse, spentPurse: 0, maxSquadSize: 10, playersCount: 0, squad: [] },
+          { id: 'team-6', name: 'Team F', shortName: 'TMF', owner: 'Team F owner', color: '#a855f7', logo: '🦅', totalPurse: startupPurse, spentPurse: 0, maxSquadSize: 10, playersCount: 0, squad: [] },
+        ];
+
+        const baseTeams = (teams && teams.length > 0) ? teams : OFFICIAL_6_TEAMS;
+        const freshTeams = baseTeams.map(t => ({
+          ...t,
+          totalPurse: t.totalPurse || startupPurse,
+          spentPurse: 0,
+          playersCount: 0,
+          squad: []
+        }));
+
+        setPlayers(freshPlayers);
+        setTeams(freshTeams);
+        setHistory([]);
+        localStorage.setItem('nepl_players', JSON.stringify(freshPlayers));
+        localStorage.setItem('nepl_teams', JSON.stringify(freshTeams));
+        localStorage.removeItem('nepl_history');
+
+        if (isMongoDB) {
+          try {
+            await Promise.all([
+              savePlayers(freshPlayers),
+              saveTeams(freshTeams),
+              saveHistory([])
+            ]);
+            liveBroadcastReset();
+            alert("✅ Bidding history wiped! All players are Available and team purses restored to 100% for a fresh auction setup.");
+          } catch (err) {
+            console.warn('Reset MongoDB error:', err);
+            alert("⚠️ Saved locally, backend sync warning: " + err.message);
+          }
+        } else {
+          liveBroadcastReset();
+          alert("✅ Bidding history wiped and reset for fresh auction setup!");
+        }
+      }
+    } else if (clean === '2' || clean.includes('reset') || clean.includes('purge')) {
       if (window.confirm("🔴 FINAL WARNING: Confirm permanent deletion of all live auction & team data from MongoDB Atlas?")) {
         setTeams([]);
         setPlayers([]);
@@ -340,10 +443,8 @@ function AppInner() {
           alert("✅ Local storage database successfully cleared by Supreme Master.");
         }
       }
-    } else if (input !== null) {
-      alert("❌ DATABASE RESET CANCELLED: Confirmation passphrase did not match!");
     }
-  }, [user]);
+  }, [user, players, teams, isMongoDB]);
 
   // ── Show login page if not authenticated ──────────────────────────────────
   if (!isAuthenticated) {
@@ -380,6 +481,8 @@ function AppInner() {
 
   return (
     <div className="min-h-screen bg-[#141413] text-[#f3f1eb] font-sans pb-28 lg:pb-16 theme-root-container transition-colors duration-300">
+      {/* Modern CSS Scroll Progress Indicator */}
+      <div id="scroll-progress" aria-hidden="true" />
 
       {/* Fullscreen Projector View */}
       {isProjectorMode ? (
@@ -388,6 +491,7 @@ function AppInner() {
           setPlayers={setPlayers}
           teams={teams}
           setTeams={setTeams}
+          history={history}
           onClose={() => setIsProjectorMode(false)}
           viewerCount={viewerCount}
           liveSocketConnected={liveSocketConnected}
@@ -396,7 +500,7 @@ function AppInner() {
         <>
           <Header
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleTabChange}
             isProjectorMode={isProjectorMode}
             setIsProjectorMode={setIsProjectorMode}
             soundEnabled={soundEnabled}
@@ -404,12 +508,14 @@ function AppInner() {
             onResetData={handleResetData}
             players={players}
             setPlayers={setPlayers}
+            teams={teams}
+            setTeams={setTeams}
             onOpenAiChat={() => setIsAiChatOpen(true)}
             viewerCount={viewerCount}
             liveSocketConnected={liveSocketConnected}
           />
 
-          <main className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6 animate-fade-in-up">
+          <main className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6">
             {activeTab === 'auction' && (
               <AuctionRoom
                 players={players}
@@ -446,7 +552,7 @@ function AppInner() {
                 onOpenAiChat={() => setIsAiChatOpen(true)}
               />
             )}
-            {activeTab === 'schedule' && (
+            {activeTab === 'schedule' && can('canViewSchedule') && (
               <ScheduleStandings
                 teams={teams}
                 matches={matches}
@@ -468,14 +574,14 @@ function AppInner() {
           {/* Mobile App-like Bottom Navigation Dock */}
           <MobileNav
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleTabChange}
             onOpenAiChat={() => setIsAiChatOpen(true)}
           />
 
           {/* Global Cyber Footer */}
           <footer className="mt-12 lg:mt-16 border-t border-cyan-500/15 pt-6 pb-8 text-center text-xs text-slate-400 font-mono flex flex-col sm:flex-row items-center justify-between gap-3 max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
             <div>
-              © {new Date().getFullYear()} onwards Nyati Era Premier League. All rights reserved.
+              © {new Date().getFullYear()} onwards {tournamentSettings?.tournamentName || 'Nyati Era'} {tournamentSettings?.subtitle || 'Box Cricket League'}. All rights reserved.
             </div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 text-xs font-serif shadow-[0_0_12px_rgba(121,40,202,0.2)]">
               <span className="text-[10px] uppercase font-sans text-slate-400">Version:</span>
@@ -500,9 +606,12 @@ function AppInner() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AppInner />
-      </AuthProvider>
+      <TournamentProvider>
+        <AuthProvider>
+          <AppInner />
+        </AuthProvider>
+      </TournamentProvider>
     </ErrorBoundary>
   );
 }
+
