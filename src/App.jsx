@@ -461,7 +461,7 @@ function AppInner() {
           </div>
         </div>
         <div className="text-center">
-          <p className="text-slate-100 font-display font-bold text-lg">NEPL Cyber Engine</p>
+          <p className="text-slate-100 font-sans font-extrabold text-xl tracking-tight">Cricket Player Engine</p>
           <p className="text-cyan-400/80 text-xs font-mono mt-1">
             {isMongoDB ? 'Syncing live with MongoDB Atlas…' : 'Initializing platform data…'}
           </p>
@@ -515,7 +515,7 @@ function AppInner() {
             liveSocketConnected={liveSocketConnected}
           />
 
-          <main className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6">
+          <main className="max-w-[1920px] 3xl:max-w-[2400px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6 pb-28 lg:pb-12">
             {activeTab === 'auction' && (
               <AuctionRoom
                 players={players}
@@ -576,6 +576,7 @@ function AppInner() {
             activeTab={activeTab}
             setActiveTab={handleTabChange}
             onOpenAiChat={() => setIsAiChatOpen(true)}
+            onToggleTv={() => setIsProjectorMode(true)}
           />
 
           {/* Global Cyber Footer */}

@@ -214,8 +214,8 @@ export default function Header({
             {can('canAccessProjector') && (
               <button
                 onClick={() => setIsProjectorMode(!isProjectorMode)}
-                className="hidden sm:flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-bold text-[11px] uppercase tracking-wider transition cursor-pointer"
-                title="Toggle Projector / TV Display Mode"
+                className="flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-bold text-[10px] sm:text-[11px] uppercase tracking-wider transition cursor-pointer shrink-0 shadow-sm"
+                title="Toggle Projector / TV Live Screen"
               >
                 <Tv className="w-3.5 h-3.5" />
                 <span>TV</span>

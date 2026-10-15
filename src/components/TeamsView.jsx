@@ -27,7 +27,12 @@ import {
   Check,
   Camera,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CheckSquare,
+  Square,
+  Filter,
+  Layers,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useTournament } from '../context/TournamentContext';
@@ -103,12 +108,15 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
     toTeamId: ''
   });
 
-  // Super Admin Add Free Player to Squad Modal State
+  // Super Admin Add Free Player to Squad Modal State (Multi-Player Team Formation)
   const [addPlayerModal, setAddPlayerModal] = useState({
     isOpen: false,
     team: null,
-    selectedPlayerId: '',
-    search: ''
+    selectedPlayerIds: [],
+    search: '',
+    roleFilter: 'all',
+    onlyAvailable: true,
+    priceMode: '0'
   });
 
   // Super Admin Bulk Roster Override Hub Modal State
@@ -174,6 +182,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       maxSquadSize: 10,
       color: availableTheme.color,
       teamPhotoUrl: '',
+      initialPlayerIds: [],
     });
     setShowModal(true);
   };
@@ -191,7 +200,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
   const openEditModal = (team) => {
     setEditingTeam(team);
     setPhotoInfo('');
-    const existingCaptain = (team.squad || []).find(p => p.isCaptain) || 
+    const existingCaptain = (team.squad || []).find(p => p.isCaptain) ||
       players.find(p => p.captainOfTeamId === team.id || (p.isCaptain && p.soldTo === team.id));
 
     setFormData({
@@ -204,6 +213,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
       maxSquadSize: team.maxSquadSize || 10,
       color: team.color || '#d4622a',
       teamPhotoUrl: team.teamPhotoUrl || '',
+      initialPlayerIds: (team.squad || []).map(p => p.id),
     });
     setShowModal(true);
   };
@@ -212,7 +222,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
   const applyCaptainAssignment = (targetTeam, newCaptainPlayerId, prevCaptainPlayerId = null) => {
     const teamId = targetTeam.id;
     let updatedSquad = [...(targetTeam.squad || [])];
-    
+
     // 1. Identify previous captain
     const oldCaptainId = prevCaptainPlayerId || targetTeam.captainId || updatedSquad.find(p => p.isCaptain)?.id;
 
@@ -257,7 +267,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
       if (playerObj) {
         assignedCaptainName = playerObj.name;
-        
+
         // Remove player from existing other teams if they were on another team
         teams.forEach(otherTeam => {
           if (otherTeam.id !== teamId && otherTeam.squad?.some(s => String(s.id) === String(newCaptainPlayerId))) {
@@ -412,11 +422,49 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
       const finalNewTeam = applyCaptainAssignment(newTeamBase, formData.captainPlayerId);
 
+      // Add any selected initial squad formation players
+      const selectedInitialIds = (formData.initialPlayerIds || []).filter(id => id !== formData.captainPlayerId);
+      const initialPlayerObjs = selectedInitialIds
+        .map(id => players.find(p => p.id === id))
+        .filter(Boolean);
+
+      const additionalSquadMembers = initialPlayerObjs.map(playerObj => ({
+        id: playerObj.id,
+        name: playerObj.name,
+        role: playerObj.role,
+        category: playerObj.category || 'Male',
+        soldPrice: 0,
+        avatarUrl: playerObj.avatarUrl || '/avatars/male.png',
+        cricHeroesUrl: playerObj.cricHeroesUrl || '',
+        isCaptain: false,
+        ratings: playerObj.ratings || {}
+      }));
+
+      const mergedSquad = [...(finalNewTeam.squad || []), ...additionalSquadMembers];
+      const finalTeamWithSquad = {
+        ...finalNewTeam,
+        squad: mergedSquad,
+        playersCount: mergedSquad.length,
+        spentPurse: mergedSquad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0)
+      };
+
       // 1. Update React state
-      setTeams(prev => [...prev, finalNewTeam]);
+      setTeams(prev => [...prev, finalTeamWithSquad]);
 
       // 2. Persist directly to MongoDB Atlas
-      apiUpdateTeam(finalNewTeam.id, finalNewTeam).catch(err => console.warn('MongoDB team create error:', err));
+      apiUpdateTeam(finalTeamWithSquad.id, finalTeamWithSquad).catch(err => console.warn('MongoDB team create error:', err));
+
+      // 3. Update player records in state & MongoDB
+      if (setPlayers && selectedInitialIds.length > 0) {
+        setPlayers(prev => prev.map(p => {
+          if (selectedInitialIds.includes(p.id)) {
+            const up = { ...p, soldTo: newTeamId, status: 'sold', soldPrice: 0, isCaptain: false, captainOfTeamId: null };
+            apiUpdatePlayer(p.id, up).catch(console.warn);
+            return up;
+          }
+          return p;
+        }));
+      }
     }
 
     setShowModal(false);
@@ -720,54 +768,106 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
 
   const handleQuickAddPlayer = (team) => {
     if (!canManage) return;
-    const availablePool = players.filter(p => p.status === 'available' || !p.soldTo);
     setAddPlayerModal({
       isOpen: true,
       team,
-      selectedPlayerId: availablePool[0]?.id || '',
-      search: ''
+      selectedPlayerIds: [],
+      search: '',
+      roleFilter: 'all',
+      onlyAvailable: true,
+      priceMode: '0'
     });
   };
 
-  const executeAddPlayer = (teamId, playerId) => {
+  const executeAddPlayers = (teamId, playerIds = [], priceMode = '0') => {
+    if (!playerIds || playerIds.length === 0) return;
     const targetTeam = teams.find(t => t.id === teamId);
-    const playerObj = players.find(p => p.id === playerId);
-    if (!targetTeam || !playerObj) return;
+    if (!targetTeam) return;
 
-    const newSquad = [...(targetTeam.squad || []).filter(p => p.id !== playerId), {
-      id: playerObj.id,
-      name: playerObj.name,
-      role: playerObj.role,
-      category: playerObj.category || 'Male',
-      soldPrice: 0,
-      avatarUrl: playerObj.avatarUrl || '/avatars/male.png',
-      cricHeroesUrl: playerObj.cricHeroesUrl || '',
-      isCaptain: false,
-      ratings: playerObj.ratings || {}
-    }];
+    const selectedPlayerObjs = players.filter(p => playerIds.includes(p.id));
+    if (!selectedPlayerObjs.length) return;
 
-    const updated = {
+    const newSquadMembers = selectedPlayerObjs.map(playerObj => {
+      const price = priceMode === 'base' ? (Number(playerObj.basePrice) || 0) : 0;
+      return {
+        id: playerObj.id,
+        name: playerObj.name,
+        role: playerObj.role,
+        category: playerObj.category || 'Male',
+        soldPrice: price,
+        avatarUrl: playerObj.avatarUrl || '/avatars/male.png',
+        cricHeroesUrl: playerObj.cricHeroesUrl || '',
+        isCaptain: Boolean(playerObj.isCaptain && (playerObj.captainOfTeamId === teamId || targetTeam.captainId === playerObj.id)),
+        ratings: playerObj.ratings || {}
+      };
+    });
+
+    // Merge into target team squad (avoid duplicate IDs)
+    const existingFiltered = (targetTeam.squad || []).filter(p => !playerIds.includes(p.id));
+    const combinedSquad = [...existingFiltered, ...newSquadMembers];
+
+    const updatedTargetTeam = {
       ...targetTeam,
-      squad: newSquad,
-      playersCount: newSquad.length,
-      spentPurse: newSquad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0)
+      squad: combinedSquad,
+      playersCount: combinedSquad.length,
+      spentPurse: combinedSquad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0)
     };
 
-    setTeams(prev => prev.map(t => t.id === teamId ? updated : t));
+    // If any selected player was previously in another team, remove from that team's squad
+    const otherAffectedTeamIds = new Set();
+    const updatedTeams = teams.map(t => {
+      if (t.id === teamId) return updatedTargetTeam;
+      const hasAny = (t.squad || []).some(m => playerIds.includes(m.id));
+      if (hasAny) {
+        otherAffectedTeamIds.add(t.id);
+        const cleanedSquad = (t.squad || []).filter(m => !playerIds.includes(m.id));
+        const hadCaptain = playerIds.includes(t.captainId);
+        return {
+          ...t,
+          squad: cleanedSquad,
+          playersCount: cleanedSquad.length,
+          spentPurse: cleanedSquad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0),
+          captainId: hadCaptain ? null : t.captainId,
+          captainName: hadCaptain ? null : t.captainName,
+        };
+      }
+      return t;
+    });
+
+    setTeams(updatedTeams);
+    apiUpdateTeam(teamId, updatedTargetTeam).catch(console.warn);
+
+    otherAffectedTeamIds.forEach(otherId => {
+      const otherTeamObj = updatedTeams.find(t => t.id === otherId);
+      if (otherTeamObj) apiUpdateTeam(otherId, otherTeamObj).catch(console.warn);
+    });
 
     if (setPlayers) {
       setPlayers(prev => prev.map(p => {
-        if (p.id === playerId) {
-          const up = { ...p, soldTo: teamId, status: 'sold', soldPrice: 0, isCaptain: false };
-          apiUpdatePlayer(playerId, up).catch(console.warn);
+        if (playerIds.includes(p.id)) {
+          const price = priceMode === 'base' ? (Number(p.basePrice) || 0) : 0;
+          const isCap = Boolean(p.isCaptain && (p.captainOfTeamId === teamId || targetTeam.captainId === p.id));
+          const up = { ...p, soldTo: teamId, status: 'sold', soldPrice: price, isCaptain: isCap, captainOfTeamId: isCap ? teamId : null };
+          apiUpdatePlayer(p.id, up).catch(console.warn);
           return up;
         }
         return p;
       }));
     }
 
-    apiUpdateTeam(teamId, updated).catch(console.warn);
-    setAddPlayerModal({ isOpen: false, team: null, selectedPlayerId: '', search: '' });
+    setAddPlayerModal({
+      isOpen: false,
+      team: null,
+      selectedPlayerIds: [],
+      search: '',
+      roleFilter: 'all',
+      onlyAvailable: true,
+      priceMode: '0'
+    });
+  };
+
+  const executeAddPlayer = (teamId, playerId) => {
+    executeAddPlayers(teamId, [playerId]);
   };
 
   const handleRemoveSquadPlayer = (team, player) => {
@@ -838,11 +938,10 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                     <button
                       key={size}
                       onClick={() => handleUpdateAllSquadSizes(size)}
-                      className={`px-2 py-0.5 rounded-lg text-xs font-mono font-black transition cursor-pointer ${
-                        isActive
-                          ? 'bg-cyan-500 text-slate-950 shadow'
-                          : 'text-slate-600 dark:text-sand-400 hover:text-slate-900 dark:hover:text-sand-100'
-                      }`}
+                      className={`px-2 py-0.5 rounded-lg text-xs font-mono font-black transition cursor-pointer ${isActive
+                        ? 'bg-cyan-500 text-slate-950 shadow'
+                        : 'text-slate-600 dark:text-sand-400 hover:text-slate-900 dark:hover:text-sand-100'
+                        }`}
                       title={`Set all teams max squad size to ${size} players`}
                     >
                       {size}
@@ -858,6 +957,19 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
               >
                 <ArrowLeftRight className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
                 <span>Roster Override Hub</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (teams.length > 0) {
+                    handleQuickAddPlayer(teams[0]);
+                  }
+                }}
+                className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 font-bold text-xs shadow-[0_0_12px_rgba(16,185,129,0.25)] transition cursor-pointer"
+                title="Super Admin: Team Formation & Multi-Player Squad Builder"
+              >
+                <UserPlus className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                <span>⚡ Team Formation</span>
               </button>
             </>
           )}
@@ -896,11 +1008,11 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
           const remainingPurse = team.totalPurse - team.spentPurse;
           const maxCapacity = team.maxSquadSize || 10;
           const isFull = squad.length >= maxCapacity;
-          
+
           // Strictly determine the ONE official team captain ID
           const officialCaptainId = team.captainId || (squad.find(p => p.isCaptain)?.id) || null;
           const captainInSquad = officialCaptainId ? squad.find(p => String(p.id) === String(officialCaptainId)) : null;
-          
+
           const battersCount = squad.filter(p => (p.role || '').includes('Batsman') || (p.role || '').includes('Pure')).length;
           const bowlersCount = squad.filter(p => (p.role || '').includes('Bowler') || (p.role || '').includes('Spin') || (p.role || '').includes('Fast')).length;
           const allRoundersCount = squad.filter(p => (p.role || '').includes('All-Rounder')).length;
@@ -930,7 +1042,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
               />
 
               {/* Radiant Ambient Corner Glow Halo */}
-              <div 
+              <div
                 className="absolute -top-12 -left-12 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-60 transition-all duration-500 group-hover:opacity-85"
                 style={{
                   backgroundColor: team.color || '#d4622a'
@@ -956,7 +1068,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                         <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-sand-100 tracking-tight font-sans flex items-center gap-2">
                           <span>{team.name}</span>
                         </h3>
-                        
+
                         {/* High Visibility Team Color Ribbon Badge */}
                         <span
                           className="px-3.5 py-1 rounded-full text-xs sm:text-sm font-black uppercase tracking-widest border font-mono shadow-sm"
@@ -983,7 +1095,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                           </button>
                         )}
                       </div>
-                      
+
                       {/* Captain & Theme Identity Highlight */}
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs sm:text-sm font-bold shadow-sm">
@@ -1009,7 +1121,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
-                    <span 
+                    <span
                       className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider border shadow-sm"
                       style={{
                         backgroundColor: isFull ? 'rgba(16, 185, 129, 0.2)' : `${team.color || '#d4622a'}25`,
@@ -1109,7 +1221,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                 )}
 
                 {/* Purse Stats with Modern Team Color Glow Shadow */}
-                <div 
+                <div
                   className="mt-6 bg-[#f4efe6] dark:bg-warm-950/75 p-5 rounded-2xl border border-[#e2dacc] dark:border-warm-800/80 space-y-3.5 transition-all duration-300 shadow-lg"
                   style={{
                     borderColor: `${team.color || '#d4622a'}40`,
@@ -1182,11 +1294,11 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                       <button
                         type="button"
                         onClick={() => handleQuickAddPlayer(team)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition cursor-pointer"
-                        title="Add an available player directly to this squad without auction"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 text-xs font-extrabold transition cursor-pointer shadow-sm"
+                        title="Form team squad by selecting multiple players in one go"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
-                        <span>+ Add Player</span>
+                        <span>+ Form / Add Players</span>
                       </button>
                     )}
                   </div>
@@ -1204,18 +1316,16 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                         return (
                           <div
                             key={player.id}
-                            className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition group/item shadow-sm ${
-                              isCap 
-                                ? 'bg-amber-100/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500/60 shadow-md ring-1 ring-amber-400/30'
-                                : 'bg-white dark:bg-warm-900/80 border-[#e2dacc] dark:border-warm-800/80 hover:border-cyan-500/40'
-                            }`}
+                            className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition group/item shadow-sm ${isCap
+                              ? 'bg-amber-100/70 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500/60 shadow-md ring-1 ring-amber-400/30'
+                              : 'bg-white dark:bg-warm-900/80 border-[#e2dacc] dark:border-warm-800/80 hover:border-cyan-500/40'
+                              }`}
                           >
                             <div className="flex items-center space-x-3.5 min-w-0 flex-1">
                               <div className="relative shrink-0">
-                                <div 
-                                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border-2 bg-[#f4efe6] dark:bg-warm-950 shadow-md ${
-                                    isCap ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-amber-400/20' : ''
-                                  }`}
+                                <div
+                                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border-2 bg-[#f4efe6] dark:bg-warm-950 shadow-md ${isCap ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-amber-400/20' : ''
+                                    }`}
                                   style={{
                                     borderColor: isCap ? '#f59e0b' : `${team.color || '#d4622a'}80`
                                   }}
@@ -1396,11 +1506,10 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                             key={theme.id}
                             type="button"
                             onClick={() => handleSelectTheme(theme)}
-                            className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition cursor-pointer relative overflow-hidden ${
-                              isSelected
-                                ? 'bg-slate-900 border-white ring-2 ring-cyan-400 shadow-lg'
-                                : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
-                            }`}
+                            className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition cursor-pointer relative overflow-hidden ${isSelected
+                              ? 'bg-slate-900 border-white ring-2 ring-cyan-400 shadow-lg'
+                              : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                              }`}
                           >
                             <div className="flex items-center justify-between gap-1 mb-1.5">
                               <div className="flex items-center gap-1.5">
@@ -1443,9 +1552,9 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                           onChange={e => setFormData({ ...formData, color: e.target.value })}
                           className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                         />
-                        <span 
-                          className="w-7 h-7 rounded-lg border-2 border-white/60 shadow-md block hover:scale-105 transition" 
-                          style={{ backgroundColor: formData.color || '#3b82f6' }} 
+                        <span
+                          className="w-7 h-7 rounded-lg border-2 border-white/60 shadow-md block hover:scale-105 transition"
+                          style={{ backgroundColor: formData.color || '#3b82f6' }}
                         />
                       </label>
                       <div>
@@ -1532,9 +1641,93 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                     </p>
                   </div>
 
+                  {/* ⚡ Initial Squad Formation (Select Multiple Players) */}
+                  {!editingTeam && (
+                    <div className="bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-emerald-300 flex items-center gap-1.5 font-sans">
+                          <Users className="w-4 h-4 text-emerald-400" />
+                          <span>Initial Squad Formation (Pick Multiple Players)</span>
+                        </label>
+                        <span className="text-[10px] text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold">
+                          {(formData.initialPlayerIds || []).filter(id => id !== formData.captainPlayerId).length} Selected
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-sand-400 font-sans">
+                        Optional: Pre-select available free agents to form the team squad immediately upon creation.
+                      </p>
+
+                      {/* Quick selection chips for selected players */}
+                      {(formData.initialPlayerIds || []).filter(id => id !== formData.captainPlayerId).length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-warm-900/80 rounded-xl border border-warm-800">
+                          {(formData.initialPlayerIds || []).filter(id => id !== formData.captainPlayerId).map(id => {
+                            const p = players.find(x => x.id === id);
+                            if (!p) return null;
+                            return (
+                              <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold text-emerald-300">
+                                <span>{p.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData(prev => ({
+                                    ...prev,
+                                    initialPlayerIds: (prev.initialPlayerIds || []).filter(x => x !== p.id)
+                                  }))}
+                                  className="text-emerald-400 hover:text-emerald-100 font-black cursor-pointer ml-0.5"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Selectable players list */}
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                        {players
+                          .filter(p => (p.status === 'available' || !p.soldTo) && p.id !== formData.captainPlayerId)
+                          .map(p => {
+                            const isSelected = (formData.initialPlayerIds || []).includes(p.id);
+                            return (
+                              <div
+                                key={p.id}
+                                onClick={() => {
+                                  setFormData(prev => {
+                                    const current = prev.initialPlayerIds || [];
+                                    const next = current.includes(p.id)
+                                      ? current.filter(x => x !== p.id)
+                                      : [...current, p.id];
+                                    return { ...prev, initialPlayerIds: next };
+                                  });
+                                }}
+                                className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition ${
+                                  isSelected
+                                    ? 'bg-emerald-500/25 border-emerald-400 text-sand-100 ring-1 ring-emerald-500/40'
+                                    : 'bg-warm-900/60 border-warm-800 text-sand-300 hover:border-warm-700'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-4 h-4 rounded flex items-center justify-center border text-[10px] ${
+                                    isSelected ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold' : 'border-warm-700 bg-warm-950'
+                                  }`}>
+                                    {isSelected ? '✓' : ''}
+                                  </div>
+                                  <span className="font-semibold text-xs">{p.name}</span>
+                                  <span className="text-[10px] text-sand-400">({p.role || 'Player'})</span>
+                                </div>
+                                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? 'bg-emerald-500/30 text-emerald-300 font-bold' : 'text-sand-400'}`}>
+                                  {isSelected ? 'Selected' : '+ Pick'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Icon Logo & Squad Economics */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                    
+
                     {/* Logo Picker */}
                     <div className="sm:col-span-5">
                       <label className="text-xs font-bold text-sand-200 block mb-1.5 font-sans">Team Icon Logo</label>
@@ -1547,8 +1740,8 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                               type="button"
                               onClick={() => setFormData({ ...formData, logo: emoji })}
                               className={`p-1 text-sm rounded-lg border transition cursor-pointer ${formData.logo === emoji
-                                  ? 'bg-terracotta-600/30 border-terracotta-500'
-                                  : 'bg-warm-900 border-warm-800 text-sand-400'
+                                ? 'bg-terracotta-600/30 border-terracotta-500'
+                                : 'bg-warm-900 border-warm-800 text-sand-400'
                                 }`}
                             >
                               {emoji}
@@ -1922,125 +2115,481 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
         document.body
       )}
 
-      {/* ── 3. Super Admin Add Free Player to Squad Modal ── */}
-      {addPlayerModal.isOpen && addPlayerModal.team && canManage && createPortal(
-        <div className="fixed inset-0 z-[100] bg-warm-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="warm-card w-full max-w-2xl p-6 sm:p-7 rounded-3xl border border-emerald-500/40 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
-              <h3 className="text-lg font-extrabold text-sand-100 flex items-center gap-2 font-sans tracking-tight">
-                <UserPlus className="w-5 h-5 text-emerald-400" />
-                <span>+ Add Player to {addPlayerModal.team.name}</span>
-              </h3>
-              <button
-                onClick={() => setAddPlayerModal({ isOpen: false, team: null, selectedPlayerId: '', search: '' })}
-                className="p-1.5 rounded-lg text-sand-500 hover:text-sand-200 bg-warm-900 border border-warm-700 cursor-pointer"
+      {/* ── 3. Super Admin Add Free Player to Squad Modal (Multi-Player Team Formation) ── */}
+      {addPlayerModal.isOpen && addPlayerModal.team && canManage && (() => {
+        const targetTeam = teams.find(t => t.id === addPlayerModal.team.id) || addPlayerModal.team;
+        const currentSquad = targetTeam.squad || [];
+        const maxCapacity = targetTeam.maxSquadSize || 10;
+        const remainingPurse = targetTeam.totalPurse - targetTeam.spentPurse;
+        const selectedIds = addPlayerModal.selectedPlayerIds || [];
+        const projectedSquadCount = currentSquad.length + selectedIds.length;
+        const isOverCapacity = projectedSquadCount > maxCapacity;
+
+        // Filter players
+        const filteredPlayers = players.filter(p => {
+          // Exclude players already in target team's squad
+          const inCurrentTeam = currentSquad.some(m => m.id === p.id);
+          if (inCurrentTeam) return false;
+
+          // Free agents only filter
+          if (addPlayerModal.onlyAvailable) {
+            const isAssigned = Boolean(p.soldTo || p.status === 'sold');
+            if (isAssigned) return false;
+          }
+
+          // Role filter
+          if (addPlayerModal.roleFilter && addPlayerModal.roleFilter !== 'all') {
+            const roleStr = (p.role || '').toLowerCase();
+            if (addPlayerModal.roleFilter === 'allrounder' && !roleStr.includes('all-rounder') && !roleStr.includes('allrounder')) return false;
+            if (addPlayerModal.roleFilter === 'batsman' && !roleStr.includes('bat')) return false;
+            if (addPlayerModal.roleFilter === 'bowler' && !roleStr.includes('bowl')) return false;
+            if (addPlayerModal.roleFilter === 'wk' && !roleStr.includes('keep') && !roleStr.includes('wk')) return false;
+          }
+
+          // Search term
+          if (addPlayerModal.search.trim()) {
+            const term = addPlayerModal.search.toLowerCase();
+            const matchName = p.name?.toLowerCase().includes(term);
+            const matchRole = p.role?.toLowerCase().includes(term);
+            const matchCategory = p.category?.toLowerCase().includes(term);
+            const matchCode = p.playerCode?.toLowerCase().includes(term);
+            if (!matchName && !matchRole && !matchCategory && !matchCode) return false;
+          }
+
+          return true;
+        });
+
+        const allFilteredSelected = filteredPlayers.length > 0 && filteredPlayers.every(p => selectedIds.includes(p.id));
+
+        const toggleSelectPlayer = (id) => {
+          setAddPlayerModal(prev => {
+            const exists = (prev.selectedPlayerIds || []).includes(id);
+            return {
+              ...prev,
+              selectedPlayerIds: exists
+                ? (prev.selectedPlayerIds || []).filter(x => x !== id)
+                : [...(prev.selectedPlayerIds || []), id]
+            };
+          });
+        };
+
+        const handleToggleSelectAllFiltered = () => {
+          if (allFilteredSelected) {
+            const filteredSet = new Set(filteredPlayers.map(p => p.id));
+            setAddPlayerModal(prev => ({
+              ...prev,
+              selectedPlayerIds: (prev.selectedPlayerIds || []).filter(id => !filteredSet.has(id))
+            }));
+          } else {
+            const newIds = filteredPlayers.map(p => p.id);
+            setAddPlayerModal(prev => ({
+              ...prev,
+              selectedPlayerIds: Array.from(new Set([...(prev.selectedPlayerIds || []), ...newIds]))
+            }));
+          }
+        };
+
+        const handleClearAll = () => {
+          setAddPlayerModal(prev => ({ ...prev, selectedPlayerIds: [] }));
+        };
+
+        // Calculate total base price of selected players
+        const selectedPlayerObjs = players.filter(p => selectedIds.includes(p.id));
+        const totalBasePrice = selectedPlayerObjs.reduce((sum, p) => sum + (Number(p.basePrice) || 0), 0);
+        const projectedRemainingPurse = addPlayerModal.priceMode === 'base' ? remainingPurse - totalBasePrice : remainingPurse;
+
+        return createPortal(
+          <div className="fixed inset-0 z-[100] bg-black/80 dark:bg-warm-950/95 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fade-in">
+            <div className="warm-card w-full max-w-4xl p-5 sm:p-7 rounded-3xl border border-emerald-500/50 space-y-4 sm:space-y-5 shadow-2xl relative max-h-[92vh] flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/30 pb-4 shrink-0">
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-sand-100 flex items-center gap-2.5 font-sans tracking-tight">
+                    <Users className="w-6 h-6 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                    <span>⚡ Squad Formation — Select Multiple Players</span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-sand-400 mt-0.5 font-sans">
+                    Pick multiple players in one go to form or expand the squad directly without individual bidding.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAddPlayerModal({ isOpen: false, team: null, selectedPlayerIds: [], search: '', roleFilter: 'all', onlyAvailable: true, priceMode: '0' })}
+                  className="self-end sm:self-center p-2 rounded-xl text-sand-400 hover:text-sand-100 bg-warm-900 border border-warm-700 cursor-pointer transition shadow-sm"
+                  title="Close Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Target Team & Capacity Overview Banner */}
+              <div
+                className="p-4 rounded-2xl border transition-all duration-300 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0"
+                style={{
+                  backgroundColor: `${targetTeam.color || '#10b981'}15`,
+                  borderColor: `${targetTeam.color || '#10b981'}50`,
+                }}
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+                {/* Team Switcher & Identity */}
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <span className="text-3xl p-2 rounded-xl bg-white dark:bg-warm-900 border border-warm-700 shadow shrink-0">
+                    {targetTeam.logo || '🏏'}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-500 dark:text-sand-400 font-mono">Forming Squad For:</span>
+                      <select
+                        value={targetTeam.id}
+                        onChange={e => {
+                          const nextTeam = teams.find(t => t.id === e.target.value);
+                          if (nextTeam) {
+                            setAddPlayerModal(prev => ({
+                              ...prev,
+                              team: nextTeam,
+                              selectedPlayerIds: []
+                            }));
+                          }
+                        }}
+                        className="bg-white dark:bg-warm-900 border border-warm-700 rounded-lg px-2.5 py-1 text-xs sm:text-sm font-extrabold text-slate-900 dark:text-sand-100 cursor-pointer shadow-sm focus:outline-none focus:border-emerald-500"
+                      >
+                        {teams.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.logo} {t.name} ({t.squad?.length || 0}/{t.maxSquadSize || 10})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-600 dark:text-sand-400">
+                      <span>Owner/Captain: <strong className="text-slate-900 dark:text-sand-200">{targetTeam.owner || targetTeam.captainName || 'Unassigned'}</strong></span>
+                      <span>•</span>
+                      <span>Purse: <strong className="text-emerald-700 dark:text-emerald-300 font-mono">₹{remainingPurse.toLocaleString()} PTS</strong></span>
+                    </div>
+                  </div>
+                </div>
 
-            <p className="text-xs text-sand-400">
-              Pick any unassigned player or free agent to place directly into this squad without an auction:
-            </p>
+                {/* Squad Capacity & Projected Count */}
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                  <div className="bg-white/80 dark:bg-warm-900/90 px-3 py-1.5 rounded-xl border border-warm-700 text-xs font-mono">
+                    <span className="text-slate-500 dark:text-sand-400">Current: </span>
+                    <strong className="text-slate-900 dark:text-sand-100">{currentSquad.length}/{maxCapacity}</strong>
+                  </div>
 
-            <div className="relative">
-              <Search className="w-4 h-4 text-sand-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search free agents by name, role or category…"
-                value={addPlayerModal.search}
-                onChange={e => setAddPlayerModal(prev => ({ ...prev, search: e.target.value }))}
-                className="w-full bg-warm-900 border border-warm-700 rounded-xl pl-9 pr-3 py-2 text-xs text-sand-100 focus:outline-none focus:border-emerald-500"
-              />
-            </div>
+                  <div className="bg-emerald-500/20 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-xs font-mono">
+                    <span className="text-emerald-700 dark:text-emerald-300 font-bold">Selected: </span>
+                    <strong className="text-emerald-800 dark:text-emerald-200 font-black">{selectedIds.length}</strong>
+                  </div>
 
-            {/* Available Players List */}
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {players
-                .filter(p => {
-                  const inCurrentTeam = (addPlayerModal.team.squad || []).some(m => m.id === p.id);
-                  if (inCurrentTeam) return false;
-                  if (!addPlayerModal.search.trim()) return true;
-                  const term = addPlayerModal.search.toLowerCase();
-                  return p.name.toLowerCase().includes(term) || (p.role && p.role.toLowerCase().includes(term)) || (p.category && p.category.toLowerCase().includes(term));
-                })
-                .map(p => {
-                  const isSelected = addPlayerModal.selectedPlayerId === p.id;
-                  const isAssignedElsewhere = Boolean(p.soldTo && p.soldTo !== addPlayerModal.team.id);
-                  const otherTeam = isAssignedElsewhere ? teams.find(t => t.id === p.soldTo) : null;
-                  return (
-                    <div
-                      key={p.id}
-                      onClick={() => setAddPlayerModal(prev => ({ ...prev, selectedPlayerId: p.id }))}
-                      className={`flex items-center justify-between p-3 rounded-2xl border transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-emerald-500/20 border-emerald-400 ring-2 ring-emerald-500/30'
-                          : 'bg-warm-900/80 border-warm-800/80 hover:border-warm-700'
+                  <div className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-bold ${
+                    isOverCapacity
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-700 dark:text-amber-300'
+                      : projectedSquadCount === maxCapacity
+                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-700 dark:text-cyan-300'
+                      : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                  }`}>
+                    {isOverCapacity ? (
+                      <span>⚠️ Exceeds capacity by {projectedSquadCount - maxCapacity} ({projectedSquadCount}/{maxCapacity})</span>
+                    ) : projectedSquadCount === maxCapacity ? (
+                      <span>✓ Squad will be Full ({maxCapacity}/{maxCapacity})</span>
+                    ) : (
+                      <span>{maxCapacity - projectedSquadCount} slots remain after add</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Purse Credit Assignment Slabs */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 px-3 py-2 bg-[#f4efe6] dark:bg-warm-900/60 rounded-xl border border-[#e2dacc] dark:border-warm-800 text-xs shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700 dark:text-sand-300">Purse Deduction Mode:</span>
+                  <div className="inline-flex rounded-lg border border-[#e2dacc] dark:border-warm-700 p-0.5 bg-white dark:bg-warm-950">
+                    <button
+                      type="button"
+                      onClick={() => setAddPlayerModal(prev => ({ ...prev, priceMode: '0' }))}
+                      className={`px-2.5 py-1 rounded-md font-bold text-xs transition cursor-pointer ${
+                        addPlayerModal.priceMode === '0'
+                          ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                          : 'text-slate-600 dark:text-sand-400 hover:text-slate-900 dark:hover:text-sand-100'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={p.avatarUrl || '/avatars/male.png'}
-                          alt={p.name}
-                          className="w-9 h-9 rounded-xl object-cover border border-warm-700"
-                        />
-                        <div>
-                          <h4 className="font-bold text-xs text-sand-100 flex items-center gap-1.5">
-                            <span>{p.name}</span>
-                            {p.isPlayingNEPL !== false ? (
-                              <span className="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300">NEPL</span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300">Reserve</span>
-                            )}
-                          </h4>
-                          <p className="text-[10px] text-sand-400">
-                            {p.role} • {p.category || 'Male'}
-                            {isAssignedElsewhere && otherTeam && (
-                              <span className="text-rose-400 ml-1">(Currently in {otherTeam.name})</span>
-                            )}
-                          </p>
+                      ₹0 PTS (Free Agent / Direct Formation)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddPlayerModal(prev => ({ ...prev, priceMode: 'base' }))}
+                      className={`px-2.5 py-1 rounded-md font-bold text-xs transition cursor-pointer ${
+                        addPlayerModal.priceMode === 'base'
+                          ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                          : 'text-slate-600 dark:text-sand-400 hover:text-slate-900 dark:hover:text-sand-100'
+                      }`}
+                    >
+                      Deduct Base Price
+                    </button>
+                  </div>
+                </div>
+
+                {addPlayerModal.priceMode === 'base' && selectedIds.length > 0 && (
+                  <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-300">
+                    Total Base Price: ₹{totalBasePrice.toLocaleString()} PTS (Remaining: ₹{projectedRemainingPurse.toLocaleString()} PTS)
+                  </span>
+                )}
+              </div>
+
+              {/* Search & Filters Controls */}
+              <div className="space-y-2 shrink-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search players by name, role, code, or category…"
+                      value={addPlayerModal.search}
+                      onChange={e => setAddPlayerModal(prev => ({ ...prev, search: e.target.value }))}
+                      className="w-full bg-[#f4efe6] dark:bg-warm-900 border border-[#e2dacc] dark:border-warm-700 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-slate-900 dark:text-sand-100 focus:outline-none focus:border-emerald-500 font-medium"
+                    />
+                    {addPlayerModal.search && (
+                      <button
+                        type="button"
+                        onClick={() => setAddPlayerModal(prev => ({ ...prev, search: '' }))}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Availability Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setAddPlayerModal(prev => ({ ...prev, onlyAvailable: !prev.onlyAvailable }))}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
+                      addPlayerModal.onlyAvailable
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-warm-900 border-warm-700 text-sand-400'
+                    }`}
+                  >
+                    <span>{addPlayerModal.onlyAvailable ? '✓ Free Agents Only' : 'Showing All Players'}</span>
+                  </button>
+                </div>
+
+                {/* Role Filter Pills & Bulk Selection Buttons */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  {/* Role Pills */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {[
+                      { id: 'all', label: 'All Roles' },
+                      { id: 'allrounder', label: 'All-Rounder' },
+                      { id: 'batsman', label: 'Batsman' },
+                      { id: 'bowler', label: 'Bowler' },
+                      { id: 'wk', label: 'Wicketkeeper' }
+                    ].map(r => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setAddPlayerModal(prev => ({ ...prev, roleFilter: r.id }))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          addPlayerModal.roleFilter === r.id
+                            ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                            : 'bg-[#f4efe6] dark:bg-warm-900 border border-[#e2dacc] dark:border-warm-800 text-slate-600 dark:text-sand-400 hover:text-slate-900 dark:hover:text-sand-100'
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Bulk Select / Deselect Actions */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 dark:text-sand-400 font-mono">
+                      {filteredPlayers.length} available
+                    </span>
+
+                    {filteredPlayers.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleToggleSelectAllFiltered}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-sky-800 dark:text-cyan-300 border border-cyan-500/30 text-xs font-bold transition cursor-pointer"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        <span>{allFilteredSelected ? 'Deselect Filtered' : `Select All Filtered (${filteredPlayers.length})`}</span>
+                      </button>
+                    )}
+
+                    {selectedIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAll}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-xs font-bold transition cursor-pointer"
+                      >
+                        Clear Selection ({selectedIds.length})
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Selectable Player Cards Grid */}
+              <div className="flex-1 overflow-y-auto pr-1 min-h-[220px] max-h-[360px] border border-[#e2dacc] dark:border-warm-800/80 rounded-2xl p-2 bg-[#f9f6f0] dark:bg-warm-950/40">
+                {filteredPlayers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-center text-slate-500 dark:text-sand-400 space-y-2">
+                    <Users className="w-8 h-8 opacity-40 text-emerald-400" />
+                    <p className="text-sm font-semibold">No players matched your search or filter.</p>
+                    <p className="text-xs text-slate-400">Try changing role filters or toggling "Showing All Players".</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {filteredPlayers.map(p => {
+                      const isSelected = selectedIds.includes(p.id);
+                      const isAssignedElsewhere = Boolean(p.soldTo && p.soldTo !== targetTeam.id);
+                      const otherTeam = isAssignedElsewhere ? teams.find(t => t.id === p.soldTo) : null;
+
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => toggleSelectPlayer(p.id)}
+                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 cursor-pointer shadow-sm ${
+                            isSelected
+                              ? 'bg-emerald-500/20 border-emerald-400 ring-2 ring-emerald-500/40 text-sand-100 shadow-md'
+                              : 'bg-white dark:bg-warm-900/80 border-[#e2dacc] dark:border-warm-800/80 hover:border-emerald-500/50 hover:bg-warm-800/20'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {/* Checkbox Icon */}
+                            <div className={`w-5 h-5 rounded-lg flex items-center justify-center border transition shrink-0 ${
+                              isSelected
+                                ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-black shadow-sm'
+                                : 'border-[#d4ccbd] dark:border-warm-700 bg-[#f4efe6] dark:bg-warm-900'
+                            }`}>
+                              {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                            </div>
+
+                            {/* Avatar */}
+                            <img
+                              src={p.avatarUrl || '/avatars/male.png'}
+                              alt={p.name}
+                              className="w-10 h-10 rounded-xl object-cover border border-[#e2dacc] dark:border-warm-700 shrink-0"
+                              onError={e => { e.target.src = '/avatars/male.png'; }}
+                            />
+
+                            {/* Details */}
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-sand-100 flex items-center gap-1.5 truncate">
+                                <span className="truncate">{p.name}</span>
+                                <label
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const nextState = p.isPlayingNEPL === false ? true : false;
+                                    const updated = { ...p, isPlayingNEPL: nextState };
+                                    if (setPlayers) setPlayers(prev => prev.map(x => x.id === p.id ? updated : x));
+                                    apiUpdatePlayer(p.id, updated).catch(console.warn);
+                                  }}
+                                  className="inline-flex items-center gap-1 cursor-pointer select-none"
+                                  title="Quick toggle: Listed to Play in NEPL"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={p.isPlayingNEPL !== false}
+                                    onChange={() => {}}
+                                    className="w-3.5 h-3.5 rounded accent-emerald-500 cursor-pointer"
+                                  />
+                                  <span className={`px-1.5 py-0.2 rounded text-[8px] font-mono font-bold ${
+                                    p.isPlayingNEPL !== false
+                                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                      : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                  }`}>
+                                    {p.isPlayingNEPL !== false ? 'NEPL' : 'Reserve'}
+                                  </span>
+                                </label>
+                              </h4>
+
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-sand-400 flex-wrap mt-0.5">
+                                <span className="font-semibold">{p.role || 'Player'}</span>
+                                <span>•</span>
+                                <span>{p.category || 'Male'}</span>
+                                {p.basePrice && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-cyan-700 dark:text-cyan-300 font-bold">₹{Number(p.basePrice).toLocaleString()} PTS</span>
+                                  </>
+                                )}
+                              </div>
+
+                              {isAssignedElsewhere && otherTeam && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5 truncate">
+                                  Currently in {otherTeam.name} (will be transferred)
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 ml-2">
+                            <span className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition ${
+                              isSelected
+                                ? 'bg-emerald-500 text-slate-950 shadow'
+                                : 'bg-[#e8e1d5] dark:bg-warm-800 text-slate-700 dark:text-sand-300'
+                            }`}>
+                              {isSelected ? '✓ Picked' : '+ Select'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-                      <div className="text-right">
-                        <span className={`px-2 py-1 rounded-lg text-[10px] font-bold font-mono ${
-                          isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-warm-800 text-sand-300'
-                        }`}>
-                          {isSelected ? '✓ Selected' : 'Select'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+              {/* Modal Footer */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#e2dacc] dark:border-warm-800 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-700 dark:text-sand-300 font-semibold">
+                    {selectedIds.length > 0 ? (
+                      <span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{selectedIds.length}</strong> player{selectedIds.length !== 1 ? 's' : ''} ready to form {targetTeam.name} squad
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 dark:text-sand-400">Select players above to form team squad</span>
+                    )}
+                  </span>
+                </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-warm-800">
-              <button
-                type="button"
-                onClick={() => setAddPlayerModal({ isOpen: false, team: null, selectedPlayerId: '', search: '' })}
-                className="btn-secondary text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!addPlayerModal.selectedPlayerId}
-                onClick={() => executeAddPlayer(addPlayerModal.team.id, addPlayerModal.selectedPlayerId)}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50"
-              >
-                Add Player to Squad
-              </button>
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setAddPlayerModal({ isOpen: false, team: null, selectedPlayerIds: [], search: '', roleFilter: 'all', onlyAvailable: true, priceMode: '0' })}
+                    className="btn-secondary text-xs sm:text-sm px-4 py-2 cursor-pointer font-bold"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selectedIds.length === 0}
+                    onClick={() => executeAddPlayers(targetTeam.id, selectedIds, addPlayerModal.priceMode)}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-emerald-500/30 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>
+                      {selectedIds.length > 0
+                        ? `Add ${selectedIds.length} Player${selectedIds.length !== 1 ? 's' : ''} to Squad in One Go`
+                        : 'Select Players to Add'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* ── 4. Super Admin Roster Override & Player Swapper Hub Modal ── */}
       {rosterHubOpen && canManage && createPortal(
         <div className="fixed inset-0 z-[100] bg-black/80 dark:bg-warm-950/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in">
           <div className="warm-card w-full max-w-[96vw] 2xl:max-w-[1750px] p-4 sm:p-6 md:p-8 rounded-3xl border border-cyan-500/50 space-y-4 sm:space-y-6 shadow-2xl relative h-[94vh] max-h-[96vh] flex flex-col">
-            
+
             {/* Modal Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-cyan-500/25 pb-4 shrink-0">
               <div className="min-w-0">
@@ -2102,7 +2651,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
             {(() => {
               const activeNeplPoolCount = players.filter(p => p.isPlayingNEPL !== false).length;
               const suggestedSquadLimit = teams.length > 0 ? Math.max(1, Math.floor(activeNeplPoolCount / teams.length)) : 10;
-              
+
               return (
                 <div className="bg-[#e9e3d5] dark:bg-warm-950/80 p-3.5 sm:p-4 rounded-2xl border border-[#d4ccbd] dark:border-cyan-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shrink-0 shadow-inner">
                   <div className="flex items-center gap-3">
@@ -2133,11 +2682,10 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                           key={size}
                           type="button"
                           onClick={() => handleUpdateAllSquadSizes(size)}
-                          className={`px-2.5 py-1 rounded-xl font-mono text-xs font-black transition cursor-pointer shadow-sm ${
-                            allHaveThis
-                              ? 'bg-cyan-500 text-slate-950 ring-2 ring-cyan-400 shadow-md'
-                              : 'bg-[#f4efe6] dark:bg-warm-900 text-slate-800 dark:text-sand-200 border border-[#d4ccbd] dark:border-warm-700 hover:border-cyan-400'
-                          }`}
+                          className={`px-2.5 py-1 rounded-xl font-mono text-xs font-black transition cursor-pointer shadow-sm ${allHaveThis
+                            ? 'bg-cyan-500 text-slate-950 ring-2 ring-cyan-400 shadow-md'
+                            : 'bg-[#f4efe6] dark:bg-warm-900 text-slate-800 dark:text-sand-200 border border-[#d4ccbd] dark:border-warm-700 hover:border-cyan-400'
+                            }`}
                           title={`Set all teams max capacity to ${size} members`}
                         >
                           {size}
@@ -2167,11 +2715,11 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                 const isFull = squad.length >= maxCap;
                 const searchLower = rosterHubSearch.trim().toLowerCase();
                 const filteredSquad = searchLower
-                  ? squad.filter(p => 
-                      p.name.toLowerCase().includes(searchLower) || 
-                      (p.role && p.role.toLowerCase().includes(searchLower)) ||
-                      (p.category && p.category.toLowerCase().includes(searchLower))
-                    )
+                  ? squad.filter(p =>
+                    p.name.toLowerCase().includes(searchLower) ||
+                    (p.role && p.role.toLowerCase().includes(searchLower)) ||
+                    (p.category && p.category.toLowerCase().includes(searchLower))
+                  )
                   : squad;
 
                 return (
@@ -2238,11 +2786,10 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                             </button>
                           </div>
 
-                          <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border shadow-sm shrink-0 ${
-                            isFull
-                              ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40'
-                              : 'bg-white dark:bg-warm-950 text-sky-800 dark:text-cyan-300 border-[#d4ccbd] dark:border-cyan-500/30'
-                          }`}>
+                          <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border shadow-sm shrink-0 ${isFull
+                            ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40'
+                            : 'bg-white dark:bg-warm-950 text-sky-800 dark:text-cyan-300 border-[#d4ccbd] dark:border-cyan-500/30'
+                            }`}>
                             {isFull ? 'Full' : `${maxCap - squad.length} Open`}
                           </span>
                         </div>
@@ -2269,15 +2816,14 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                         }).map(p => {
                           const isCap = Boolean(p.isCaptain || (team.captainId && String(p.id) === String(team.captainId)));
                           const fullPlayerData = players.find(pl => pl.id === p.id) || p;
-                          
+
                           return (
                             <div
                               key={p.id}
-                              className={`flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 shadow-sm gap-2.5 ${
-                                isCap
-                                  ? 'bg-amber-100/70 dark:bg-amber-950/35 border-amber-400 dark:border-amber-500/60 ring-1 ring-amber-400/30'
-                                  : 'bg-white dark:bg-warm-950/70 border-[#e2dacc] dark:border-warm-800/80 hover:border-cyan-500/40'
-                              }`}
+                              className={`flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 shadow-sm gap-2.5 ${isCap
+                                ? 'bg-amber-100/70 dark:bg-amber-950/35 border-amber-400 dark:border-amber-500/60 ring-1 ring-amber-400/30'
+                                : 'bg-white dark:bg-warm-950/70 border-[#e2dacc] dark:border-warm-800/80 hover:border-cyan-500/40'
+                                }`}
                             >
                               {/* Player Avatar + Info */}
                               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -2285,9 +2831,8 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                                   <img
                                     src={fullPlayerData.avatarUrl || p.avatarUrl || '/avatars/male.png'}
                                     alt={p.name}
-                                    className={`w-11 h-11 rounded-xl object-cover border shadow-sm ${
-                                      isCap ? 'border-amber-400 ring-1 ring-amber-400/40' : 'border-[#d4ccbd] dark:border-warm-700'
-                                    }`}
+                                    className={`w-11 h-11 rounded-xl object-cover border shadow-sm ${isCap ? 'border-amber-400 ring-1 ring-amber-400/40' : 'border-[#d4ccbd] dark:border-warm-700'
+                                      }`}
                                     onError={e => { e.target.src = '/avatars/male.png'; }}
                                   />
                                   {isCap && (
@@ -2371,7 +2916,7 @@ export default function TeamsView({ teams, setTeams, players = [], setPlayers, o
                         className="w-full py-2.5 sm:py-3 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 text-xs sm:text-sm font-extrabold transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                       >
                         <UserPlus className="w-4 h-4" />
-                        <span>+ Add Free Player to Squad</span>
+                        <span>+ Form Squad / Add Multiple Players</span>
                       </button>
                     </div>
                   </div>

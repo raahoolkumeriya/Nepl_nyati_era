@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Gavel, 
   Users, 
@@ -6,14 +5,16 @@ import {
   Calendar, 
   BookOpen, 
   Sparkles,
-  Bot
+  Bot,
+  Tv
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 
 export default function MobileNav({ 
   activeTab, 
   setActiveTab, 
-  onOpenAiChat 
+  onOpenAiChat,
+  onToggleTv 
 }) {
   const { can } = useAuth();
 
@@ -65,6 +66,22 @@ export default function MobileNav({
             </button>
           );
         })}
+
+        {/* Live TV Projector Live Screen Trigger on Mobile */}
+        {can('canAccessProjector') && (
+          <button
+            onClick={onToggleTv}
+            className="relative flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-2xl transition-all duration-150 active:scale-90 cursor-pointer group"
+            title="Open Live TV Projector Screen for Live Rendering"
+          >
+            <div className="relative p-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 group-hover:scale-105 transition-transform shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+              <Tv className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <span className="text-[10px] tracking-tight mt-0.5 font-bold font-sans text-amber-300">
+              Live TV
+            </span>
+          </button>
+        )}
 
         {/* Floating Gemini AI Quick Assistant Tab */}
         <button

@@ -591,75 +591,86 @@ export default function ProjectorView({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#070b14] text-white flex flex-col justify-between p-4 sm:p-8 select-none overflow-hidden font-sans">
+    <div className="fixed inset-0 z-50 bg-[#070b14] text-white flex flex-col p-3 sm:p-6 lg:p-8 select-none overflow-y-auto lg:overflow-hidden font-sans lg:justify-between">
       
       {/* Background Neon Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-gradient-to-tr from-cyan-500/10 via-purple-600/10 to-rose-600/10 rounded-full blur-[140px] pointer-events-none"></div>
 
       {/* ⚡ High-Impact Live Bid Pop-in Broadcast Alert */}
       {latestBidAlert && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 backdrop-blur-2xl px-6 py-3.5 rounded-2xl border-2 border-cyan-400 shadow-[0_0_50px_rgba(0,242,254,0.65)] flex items-center gap-3.5 animate-fade-in">
-          <span className="relative flex h-3.5 w-3.5">
+        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 backdrop-blur-2xl px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl border-2 border-cyan-400 shadow-[0_0_50px_rgba(0,242,254,0.65)] flex items-center gap-2.5 sm:gap-3.5 animate-fade-in max-w-[94vw]">
+          <span className="relative flex h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-cyan-500"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 sm:h-3.5 sm:w-3.5 bg-cyan-500"></span>
           </span>
-          <span className="text-[11px] font-black uppercase tracking-widest text-cyan-300 font-mono">
-            {latestBidAlert.type === 'SOLD' ? '🔨 SOLD OUT' : '⚡ LIVE BID APPLIED'}
+          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-cyan-300 font-mono shrink-0">
+            {latestBidAlert.type === 'SOLD' ? '🔨 SOLD' : '⚡ LIVE BID'}
           </span>
-          <span className="text-white font-black text-base sm:text-xl">
+          <span className="text-white font-black text-sm sm:text-xl truncate max-w-[120px] sm:max-w-none">
             {latestBidAlert.teamName}
           </span>
-          <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-400 drop-shadow-[0_0_15px_#00ff87]">
+          <span className="text-lg sm:text-3xl font-black font-mono text-emerald-400 drop-shadow-[0_0_15px_#00ff87] shrink-0">
             ₹{latestBidAlert.amount} PTS
           </span>
-          <span className="text-xs text-slate-300 font-sans hidden sm:inline">
+          <span className="text-xs text-slate-300 font-sans hidden md:inline">
             for <strong className="text-amber-300">{latestBidAlert.playerName}</strong>
           </span>
         </div>
       )}
 
       {/* ── Top TV Header Controls ── */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 z-10 border-b border-cyan-500/20 pb-4 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 z-10 border-b border-cyan-500/20 pb-3 sm:pb-4 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto shrink-0">
         
-        {/* Branding */}
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white p-1 border border-cyan-500/40 shadow-[0_0_20px_rgba(0,242,254,0.4)] shrink-0 flex items-center justify-center">
-            <img
-              src={tournamentSettings?.logoUrl || '/nyati_era_logo.png'}
-              alt={tournamentSettings?.tournamentName || 'Tournament Logo'}
-              className="w-full h-full object-contain"
-              onError={(e) => { e.target.src = '/nyati_era_logo.png'; }}
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight gradient-text-brand font-sans">
-                {tournamentSettings?.tournamentName || 'Nyati Era'} {tournamentSettings?.subtitle || 'Premier League'} {tournamentSettings?.edition || new Date().getFullYear()}
-              </h1>
-              <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-serif font-bold shadow-[0_0_12px_rgba(121,40,202,0.3)]">
-                कर्मण्येवाधिकारस्ते
-              </span>
+        {/* Branding & Quick Exit on Mobile */}
+        <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl overflow-hidden bg-white p-1 border border-cyan-500/40 shadow-[0_0_20px_rgba(0,242,254,0.4)] shrink-0 flex items-center justify-center">
+              <img
+                src={tournamentSettings?.logoUrl || '/nyati_era_logo.png'}
+                alt={tournamentSettings?.tournamentName || 'Tournament Logo'}
+                className="w-full h-full object-contain"
+                onError={(e) => { e.target.src = '/nyati_era_logo.png'; }}
+              />
             </div>
-            <div className="flex items-center gap-2.5 mt-0.5">
-              <p className="text-xs text-cyan-400 font-mono font-bold flex items-center gap-2">
-                <span>Live TV Projector Screen</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#00ff87]" />
-              </p>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-[10px] font-bold text-red-400 font-mono tracking-tight animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-                <span>STREAM SYNCED • {viewerCount || 1} {viewerCount === 1 ? 'DEVICE' : 'DEVICES'}</span>
-              </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h1 className="text-base sm:text-2xl font-extrabold tracking-tight gradient-text-brand font-sans truncate">
+                  {tournamentSettings?.tournamentName || 'Nyati Era'} {tournamentSettings?.subtitle || 'Premier League'}
+                </h1>
+                <span className="hidden md:inline-block px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-serif font-bold shadow-[0_0_12px_rgba(121,40,202,0.3)]">
+                  कर्मण्येवाधिकारस्ते
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <p className="text-[11px] sm:text-xs text-cyan-400 font-mono font-bold flex items-center gap-1.5">
+                  <span>Live TV Screen</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#00ff87]" />
+                </p>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-[9px] sm:text-[10px] font-bold text-red-400 font-mono tracking-tight animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                  <span>SYNCED • {viewerCount || 1} {viewerCount === 1 ? 'DEV' : 'DEVS'}</span>
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Mobile Exit TV Button */}
+          <button
+            onClick={onClose}
+            className="sm:hidden flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold uppercase tracking-wider transition shadow-sm shrink-0 cursor-pointer"
+          >
+            <Tv className="w-3.5 h-3.5 text-rose-400" />
+            <span>Exit</span>
+          </button>
         </div>
 
-        {/* Navigation & Status Pills */}
-        <div className="flex items-center space-x-3">
+        {/* Navigation & Status Counter Pills */}
+        <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-3">
           {/* Status Counter Badge */}
-          <div className="flex items-center space-x-2 bg-slate-900/90 px-3.5 py-1.5 rounded-xl border border-slate-800 text-xs font-mono">
-            <span className="text-emerald-400 font-bold">{availablePlayers.length} Available</span>
+          <div className="flex items-center space-x-2 bg-slate-900/90 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-slate-800 text-[11px] sm:text-xs font-mono">
+            <span className="text-emerald-400 font-bold">{availablePlayers.length} Avail</span>
             <span className="text-slate-600">•</span>
-            <span className="text-rose-400 font-bold">{soldPlayers.length} Sold Out</span>
+            <span className="text-rose-400 font-bold">{soldPlayers.length} Sold</span>
           </div>
 
           {/* Player Switcher Prev/Next */}
@@ -667,28 +678,28 @@ export default function ProjectorView({
             <div className="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
               <button
                 onClick={handlePrevPlayer}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition"
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 transition cursor-pointer"
                 title="Previous Player"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
-              <span className="text-xs font-mono font-bold text-slate-400 px-2">
+              <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-400 px-1.5 sm:px-2">
                 {currentIndex + 1} / {players.length}
               </span>
               <button
                 onClick={handleNextPlayer}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition"
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 transition cursor-pointer"
                 title="Next Player"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           )}
 
-          {/* Exit TV Button */}
+          {/* Exit TV Button (Tablet/Desktop) */}
           <button
             onClick={onClose}
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold uppercase tracking-wider transition shadow-sm"
+            className="hidden sm:flex items-center space-x-2 px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
           >
             <Tv className="w-4 h-4 text-rose-400" />
             <span>Exit TV</span>
@@ -753,10 +764,10 @@ export default function ProjectorView({
               {activeNavPool.length > 1 && (
                 <button
                   onClick={handlePrevAvailablePlayer}
-                  className="absolute -left-4 sm:-left-6 top-1/3 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
+                  className="absolute -left-2 sm:-left-6 top-1/3 -translate-y-1/2 z-30 p-2 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
                   title="Previous Available Player (←)"
                 >
-                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover:-translate-x-0.5" />
+                  <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6 transition-transform group-hover:-translate-x-0.5" />
                 </button>
               )}
 
@@ -770,7 +781,7 @@ export default function ProjectorView({
               }`}>
                 
                 {/* Photo Area with Direct On-Image Pagination Controls */}
-                <div className="h-72 sm:h-80 xl:h-[380px] 2xl:h-[420px] 3xl:h-[460px] w-full relative overflow-hidden bg-slate-950 select-none group/photo">
+                <div className="h-64 sm:h-80 xl:h-[380px] 2xl:h-[420px] 3xl:h-[460px] w-full relative overflow-hidden bg-slate-950 select-none group/photo">
                   <img
                     key={activePlayer.id}
                     src={activePlayer.avatarUrl}
@@ -953,10 +964,10 @@ export default function ProjectorView({
               {activeNavPool.length > 1 && (
                 <button
                   onClick={handleNextAvailablePlayer}
-                  className="absolute -right-4 sm:-right-6 top-1/3 -translate-y-1/2 z-30 p-2.5 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
+                  className="absolute -right-2 sm:-right-6 top-1/3 -translate-y-1/2 z-30 p-2 sm:p-3.5 rounded-2xl bg-[#070b14]/90 hover:bg-cyan-400 text-cyan-300 hover:text-slate-950 border border-cyan-500/50 hover:border-cyan-300 shadow-[0_0_25px_rgba(0,0,0,0.9)] hover:shadow-[0_0_30px_rgba(0,242,254,0.8)] transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
                   title="Next Available Player (→)"
                 >
-                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover:translate-x-0.5" />
+                  <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6 transition-transform group-hover:translate-x-0.5" />
                 </button>
               )}
             </div>
@@ -1277,50 +1288,50 @@ export default function ProjectorView({
                 )}
               </div>
             ) : canSell ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={handleMarkUnsold}
                   disabled={isProcessing}
-                  className={`flex items-center justify-center space-x-2 px-5 py-4 rounded-2xl font-bold text-sm border transition cursor-pointer shrink-0 shadow-md ${
+                  className={`flex items-center justify-center space-x-1.5 sm:space-x-2 px-3 sm:px-5 py-3 sm:py-4 rounded-2xl font-bold text-xs sm:text-sm border transition cursor-pointer shrink-0 shadow-md ${
                     isUnsold 
                       ? 'bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border-amber-500/50 hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]' 
                       : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
                   }`}
                   title={isUnsold ? 'Player is already unsold — Advance to next player (→)' : 'Pass player / Mark as Unsold'}
                 >
-                  <XCircle className={`w-5 h-5 ${isUnsold ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span className="hidden sm:inline">{isUnsold ? 'Marked Unsold (Next →)' : 'Pass / Unsold'}</span>
+                  <XCircle className={`w-4 h-4 sm:w-5 sm:h-5 ${isUnsold ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <span>{isUnsold ? 'Unsold' : 'Pass'}</span>
                 </button>
 
                 {leadingTeamObj && (
                   <button
                     onClick={handleRevokeBid}
                     disabled={isProcessing}
-                    className="flex items-center justify-center space-x-1.5 px-4 py-4 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs border border-rose-500/40 transition cursor-pointer shrink-0 shadow-md"
+                    className="flex items-center justify-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-4 py-3 sm:py-4 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs border border-rose-500/40 transition cursor-pointer shrink-0 shadow-md"
                     title="Revoke current high bid and reset to base price"
                   >
-                    <RotateCcw className="w-4 h-4 text-rose-400" />
-                    <span className="hidden sm:inline">Revoke Bid</span>
+                    <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
+                    <span>Revoke</span>
                   </button>
                 )}
 
                 <button
                   onClick={handleSold}
                   disabled={isProcessing || !leadingTeamObj}
-                  className={`flex-1 py-4 sm:py-5 px-6 rounded-2xl font-black text-lg sm:text-xl uppercase tracking-wider transition flex items-center justify-center space-x-3 shadow-2xl cursor-pointer ${
+                  className={`flex-1 py-3 sm:py-5 px-3 sm:px-6 rounded-2xl font-black text-xs sm:text-xl uppercase tracking-wider transition flex items-center justify-center space-x-2 sm:space-x-3 shadow-2xl cursor-pointer ${
                     leadingTeamObj
                       ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 text-slate-950 hover:scale-[1.02] shadow-[0_0_30px_rgba(0,242,254,0.45)] active:scale-95'
                       : 'bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800'
                   }`}
                   title={leadingTeamObj ? `Hammer Sold to ${leadingTeamObj.name} for ₹${currentBid} PTS` : 'Place a bid with any team first'}
                 >
-                  <Gavel className="w-6 h-6 sm:w-7 sm:h-7 transform -rotate-45 text-slate-950" />
-                  <span>Hammer Sold (₹{currentBid} PTS)</span>
+                  <Gavel className="w-5 h-5 sm:w-7 sm:h-7 transform -rotate-45 text-slate-950 shrink-0" />
+                  <span className="truncate">Hammer Sold (₹{currentBid} PTS)</span>
                 </button>
               </div>
             ) : (
-              <div className="w-full py-4 rounded-2xl font-bold text-sm bg-slate-900/90 text-slate-400 border border-slate-800 flex items-center justify-center space-x-2">
-                <Lock className="w-5 h-5 text-amber-400" />
+              <div className="w-full py-3.5 sm:py-4 rounded-2xl font-bold text-xs sm:text-sm bg-slate-900/90 text-slate-400 border border-slate-800 flex items-center justify-center space-x-2">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
                 <span>Super Admin / Auctioneer Only (Hammer Sold)</span>
               </div>
             )}
@@ -1337,10 +1348,10 @@ export default function ProjectorView({
 
       {/* ── Franchise Captains Showcase Footer Bar ── */}
       <div className="z-10 border-t border-slate-800/80 pt-3 max-w-[1800px] 3xl:max-w-[2100px] w-full mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
-              <Crown className="w-3 h-3 text-amber-400" /> TEAM CAPTAINS:
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+              <Crown className="w-3 h-3 text-amber-400" /> CAPTAINS:
             </span>
             {teams.map((t) => {
               const cap = getCaptainInfo(t);
@@ -1348,7 +1359,7 @@ export default function ProjectorView({
               return (
                 <div 
                   key={t.id}
-                  className="flex items-center space-x-1.5 bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-800 text-[11px]"
+                  className="flex items-center space-x-1.5 bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-800 text-[11px] shrink-0"
                 >
                   <span>{t.logo}</span>
                   <img
@@ -1368,7 +1379,7 @@ export default function ProjectorView({
             })}
           </div>
 
-          <div className="text-slate-500 text-[11px] hidden md:block">
+          <div className="text-slate-500 text-[11px] hidden md:block shrink-0">
             {tournamentSettings?.tournamentName || 'Nyati Era'} {tournamentSettings?.subtitle || 'Box Cricket League'} {tournamentSettings?.edition || new Date().getFullYear()}
           </div>
         </div>
